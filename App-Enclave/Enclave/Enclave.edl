@@ -1,0 +1,36 @@
+
+
+enclave {
+
+	include "sharedTypes.h"
+	from "sgx_tstdc.edl" import *;
+	from "sgx_pthread.edl" import *;
+
+	trusted {
+
+		public void ecall_init();
+		public void ecall_file_init([in, string] const char *fileName,[out] Tag *tag,[out, size=10, count=10] uint8_t *sigma, int numBlocks);
+		public void ecall_audit_file([in, string] const char *fileName,[out] int *ret);
+	};
+
+	untrusted {
+
+
+
+		void ocall_ftl_init([in, count=64] uint8_t *sgx_pubKey, [out,count=64] uint8_t *ftl_pubKey);
+
+		void ocall_get_block([out, count=4096] uint8_t *data, size_t pageSize, int pagePerBlock, int blockNum,[in, size=1024] char *fileName);
+
+		void ocall_printf([in, count=size] unsigned char *buffer, size_t size, int type);
+
+		void ocall_send_nonce([in, count=16] uint8_t *nonce);
+
+		void ocall_get_page([in, string] const char *fileName, int pageNum,[out, size=PAGE_SIZE] uint8_t *pageData);
+
+		void ocall_init_parity(int numBits);
+
+		void ocall_write_parity([in, count=blocksInGroup, size=4096] uint16_t *data, int blocksInGroup, int groupNum);
+
+	};
+};
+
