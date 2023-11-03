@@ -181,15 +181,17 @@ void get_sigma(BIGNUM *sigma, BIGNUM **data, BIGNUM **alpha, uint8_t blockNum, u
  */
 
 void generate_file_parity(int fileNum) {
-    // NUM_ORIGINAL_SEGMENTS is k
-    // NUM_TOTAL_SEGMENTS is n
-    // porSK.sortKey is the PRP key to get the group
+
+    /* 
+	 * NUM_ORIGINAL_SEGMENTS is k
+     * NUM_TOTAL_SEGMENTS is n
+     * porSK.sortKey is the PRP key to get the group
+	 */
 
     // Generate groups array.
     int numBlocks = files[fileNum].numBlocks;
     int numPages = numBlocks * PAGE_PER_BLOCK;
-    int numBits = (int)ceil(log2(numPages));
-    ocall_init_parity(numBits);
+    int numBits = (int)ceil(log2(numPages)); // TODO: the value of numbits may not be right. Double check this now that the permutation granularity changed.
 
     uint64_t **groups = get_groups(porSK.sortKey, numBlocks, NUM_ORIGINAL_SEGMENTS);
 
@@ -205,27 +207,41 @@ void generate_file_parity(int fileNum) {
 
     // Loop through each group, getting the data at the permuted index, decrypting it,
     // generating parity data, encrypting it and sending it to FTL.
+
+	ocall_init_parity(numBits); /* 
+							     * This Does two things:
+							     * It initiates the parity generation mode in the FTL,
+							     * and tells it how many bits are being used in the permutation. 
+							     */
+
+
+	/* 
+	 * TODO: This is to many variables with pageNum, what do each of these variables do exactly? are all necessary? can I simplify the procedure?
+	 * Further, the concept of page, sector, block need to be differentiated properly.
+	 */
     int blockNum = 0;
     int realPageNum = 0;
     int permPageNum = 0;
     int pageNum = 0;
     int newPageNum = 0;
     int address = 0;
-    int maxBlocksPerGroup = ceil(numBlocks / NUM_ORIGINAL_SEGMENTS);
-    uint8_t pageData[512];
+    int maxBlocksPerGroup = ceil(numBlocks / NUM_ORIGINAL_SEGMENTS); // TODO: Instead of group and segment, call these partitions?
     int blocksInGroup = 0;
+	uint8_t pageData[512];
+
 
     uint8_t groupData[maxBlocksPerGroup * PAGE_PER_BLOCK * 512]; // to hold all the data for the group
 
-    for (int i = 0; i < NUM_ORIGINAL_SEGMENTS; i++) {
+    for (int i = 0; i < NUM_ORIGINAL_SEGMENTS; i++) { // TODO: name i better
+
         blocksInGroup = 0;
 
         for (int j = 0; j < maxBlocksPerGroup * PAGE_PER_BLOCK; j++) {
             memset(groupData + j * 512, 0, 512); // Initialize groupData to zeros
         }
 
-        for (int j = 0; j < maxBlocksPerGroup; j++) {
-            int blockNum = groups[i][j] - 1;
+        for (int j = 0; j < maxBlocksPerGroup; j++) { // TODO: name j better
+            int blockNum = groups[i][j] - 1; // TODO: I shouldn't need -1 here. Change get_groups to do this better. (use -1 for empty instead of 0??)
             ocall_printf(&blockNum, 4, 1);
             if (groups[i][j] == 0) {
                 continue;
@@ -316,7 +332,9 @@ void generate_file_parity(int fileNum) {
 				ocall_write_parity((uint16_t *) intData, blocksInGroup, i); // This assumes groups are all same size.
 		free_rs_int(rs);
     	free(intData);
+
     }
+
     ocall_init_parity(numBits);
 }
 
