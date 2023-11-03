@@ -1,0 +1,1285 @@
+###############################################################################
+#
+# IAR ANSI C/C++ Compiler V7.40.5.9725/W32 for ARM        28/Oct/2023  18:58:36
+# Copyright 1999-2015 IAR Systems AB.
+#
+#    Cpu mode     =  thumb
+#    Endian       =  little
+#    Source file  =  C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\core\ftl\aes.c
+#    Command line =  
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\core\ftl\aes.c -D
+#        BOOT_LEVEL_2 -lcN
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\Debug\List -o
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\Debug\Obj --no_cse
+#        --no_unroll --no_inline --no_code_motion --no_tbaa --no_clustering
+#        --no_scheduling --debug --endian=little --cpu=ARM926EJ-S -e --fpu=None
+#        --dlib_config "C:\Program Files (x86)\IAR Systems\Embedded Workbench
+#        7.2\arm\INC\c\DLib_Config_Normal.h" -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\ -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\sys\lpc313x\bsp\
+#        -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\sys\lpc313x\csp\
+#        -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\sys\lpc313x\lib\
+#        -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\sys\lpc313x\usb\
+#        --cpu_mode thumb -Ol --use_c++_inline
+#    List file    =  
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\Debug\List\aes.lst
+#    Object file  =  
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\Debug\Obj\aes.o
+#
+###############################################################################
+
+C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\core\ftl\aes.c
+      1          #include "stdio.h"
+      2          #include "aes.h"
+      3          
+      4          /*#include <core/inc/aes.h>*/
+      5          static const unsigned int Te0[256] = {
+      6              0xc66363a5UL, 0xf87c7c84UL, 0xee777799UL, 0xf67b7b8dUL,
+      7              0xfff2f20dUL, 0xd66b6bbdUL, 0xde6f6fb1UL, 0x91c5c554UL,
+      8              0x60303050UL, 0x02010103UL, 0xce6767a9UL, 0x562b2b7dUL,
+      9              0xe7fefe19UL, 0xb5d7d762UL, 0x4dababe6UL, 0xec76769aUL,
+     10              0x8fcaca45UL, 0x1f82829dUL, 0x89c9c940UL, 0xfa7d7d87UL,
+     11              0xeffafa15UL, 0xb25959ebUL, 0x8e4747c9UL, 0xfbf0f00bUL,
+     12              0x41adadecUL, 0xb3d4d467UL, 0x5fa2a2fdUL, 0x45afafeaUL,
+     13              0x239c9cbfUL, 0x53a4a4f7UL, 0xe4727296UL, 0x9bc0c05bUL,
+     14              0x75b7b7c2UL, 0xe1fdfd1cUL, 0x3d9393aeUL, 0x4c26266aUL,
+     15              0x6c36365aUL, 0x7e3f3f41UL, 0xf5f7f702UL, 0x83cccc4fUL,
+     16              0x6834345cUL, 0x51a5a5f4UL, 0xd1e5e534UL, 0xf9f1f108UL,
+     17              0xe2717193UL, 0xabd8d873UL, 0x62313153UL, 0x2a15153fUL,
+     18              0x0804040cUL, 0x95c7c752UL, 0x46232365UL, 0x9dc3c35eUL,
+     19              0x30181828UL, 0x379696a1UL, 0x0a05050fUL, 0x2f9a9ab5UL,
+     20              0x0e070709UL, 0x24121236UL, 0x1b80809bUL, 0xdfe2e23dUL,
+     21              0xcdebeb26UL, 0x4e272769UL, 0x7fb2b2cdUL, 0xea75759fUL,
+     22              0x1209091bUL, 0x1d83839eUL, 0x582c2c74UL, 0x341a1a2eUL,
+     23              0x361b1b2dUL, 0xdc6e6eb2UL, 0xb45a5aeeUL, 0x5ba0a0fbUL,
+     24              0xa45252f6UL, 0x763b3b4dUL, 0xb7d6d661UL, 0x7db3b3ceUL,
+     25              0x5229297bUL, 0xdde3e33eUL, 0x5e2f2f71UL, 0x13848497UL,
+     26              0xa65353f5UL, 0xb9d1d168UL, 0x00000000UL, 0xc1eded2cUL,
+     27              0x40202060UL, 0xe3fcfc1fUL, 0x79b1b1c8UL, 0xb65b5bedUL,
+     28              0xd46a6abeUL, 0x8dcbcb46UL, 0x67bebed9UL, 0x7239394bUL,
+     29              0x944a4adeUL, 0x984c4cd4UL, 0xb05858e8UL, 0x85cfcf4aUL,
+     30              0xbbd0d06bUL, 0xc5efef2aUL, 0x4faaaae5UL, 0xedfbfb16UL,
+     31              0x864343c5UL, 0x9a4d4dd7UL, 0x66333355UL, 0x11858594UL,
+     32              0x8a4545cfUL, 0xe9f9f910UL, 0x04020206UL, 0xfe7f7f81UL,
+     33              0xa05050f0UL, 0x783c3c44UL, 0x259f9fbaUL, 0x4ba8a8e3UL,
+     34              0xa25151f3UL, 0x5da3a3feUL, 0x804040c0UL, 0x058f8f8aUL,
+     35              0x3f9292adUL, 0x219d9dbcUL, 0x70383848UL, 0xf1f5f504UL,
+     36              0x63bcbcdfUL, 0x77b6b6c1UL, 0xafdada75UL, 0x42212163UL,
+     37              0x20101030UL, 0xe5ffff1aUL, 0xfdf3f30eUL, 0xbfd2d26dUL,
+     38              0x81cdcd4cUL, 0x180c0c14UL, 0x26131335UL, 0xc3ecec2fUL,
+     39              0xbe5f5fe1UL, 0x359797a2UL, 0x884444ccUL, 0x2e171739UL,
+     40              0x93c4c457UL, 0x55a7a7f2UL, 0xfc7e7e82UL, 0x7a3d3d47UL,
+     41              0xc86464acUL, 0xba5d5de7UL, 0x3219192bUL, 0xe6737395UL,
+     42              0xc06060a0UL, 0x19818198UL, 0x9e4f4fd1UL, 0xa3dcdc7fUL,
+     43              0x44222266UL, 0x542a2a7eUL, 0x3b9090abUL, 0x0b888883UL,
+     44              0x8c4646caUL, 0xc7eeee29UL, 0x6bb8b8d3UL, 0x2814143cUL,
+     45              0xa7dede79UL, 0xbc5e5ee2UL, 0x160b0b1dUL, 0xaddbdb76UL,
+     46              0xdbe0e03bUL, 0x64323256UL, 0x743a3a4eUL, 0x140a0a1eUL,
+     47              0x924949dbUL, 0x0c06060aUL, 0x4824246cUL, 0xb85c5ce4UL,
+     48              0x9fc2c25dUL, 0xbdd3d36eUL, 0x43acacefUL, 0xc46262a6UL,
+     49              0x399191a8UL, 0x319595a4UL, 0xd3e4e437UL, 0xf279798bUL,
+     50              0xd5e7e732UL, 0x8bc8c843UL, 0x6e373759UL, 0xda6d6db7UL,
+     51              0x018d8d8cUL, 0xb1d5d564UL, 0x9c4e4ed2UL, 0x49a9a9e0UL,
+     52              0xd86c6cb4UL, 0xac5656faUL, 0xf3f4f407UL, 0xcfeaea25UL,
+     53              0xca6565afUL, 0xf47a7a8eUL, 0x47aeaee9UL, 0x10080818UL,
+     54              0x6fbabad5UL, 0xf0787888UL, 0x4a25256fUL, 0x5c2e2e72UL,
+     55              0x381c1c24UL, 0x57a6a6f1UL, 0x73b4b4c7UL, 0x97c6c651UL,
+     56              0xcbe8e823UL, 0xa1dddd7cUL, 0xe874749cUL, 0x3e1f1f21UL,
+     57              0x964b4bddUL, 0x61bdbddcUL, 0x0d8b8b86UL, 0x0f8a8a85UL,
+     58              0xe0707090UL, 0x7c3e3e42UL, 0x71b5b5c4UL, 0xcc6666aaUL,
+     59              0x904848d8UL, 0x06030305UL, 0xf7f6f601UL, 0x1c0e0e12UL,
+     60              0xc26161a3UL, 0x6a35355fUL, 0xae5757f9UL, 0x69b9b9d0UL,
+     61              0x17868691UL, 0x99c1c158UL, 0x3a1d1d27UL, 0x279e9eb9UL,
+     62              0xd9e1e138UL, 0xebf8f813UL, 0x2b9898b3UL, 0x22111133UL,
+     63              0xd26969bbUL, 0xa9d9d970UL, 0x078e8e89UL, 0x339494a7UL,
+     64              0x2d9b9bb6UL, 0x3c1e1e22UL, 0x15878792UL, 0xc9e9e920UL,
+     65              0x87cece49UL, 0xaa5555ffUL, 0x50282878UL, 0xa5dfdf7aUL,
+     66              0x038c8c8fUL, 0x59a1a1f8UL, 0x09898980UL, 0x1a0d0d17UL,
+     67              0x65bfbfdaUL, 0xd7e6e631UL, 0x844242c6UL, 0xd06868b8UL,
+     68              0x824141c3UL, 0x299999b0UL, 0x5a2d2d77UL, 0x1e0f0f11UL,
+     69              0x7bb0b0cbUL, 0xa85454fcUL, 0x6dbbbbd6UL, 0x2c16163aUL,
+     70          };
+     71          static const unsigned int Te1[256] = {
+     72              0xa5c66363UL, 0x84f87c7cUL, 0x99ee7777UL, 0x8df67b7bUL,
+     73              0x0dfff2f2UL, 0xbdd66b6bUL, 0xb1de6f6fUL, 0x5491c5c5UL,
+     74              0x50603030UL, 0x03020101UL, 0xa9ce6767UL, 0x7d562b2bUL,
+     75              0x19e7fefeUL, 0x62b5d7d7UL, 0xe64dababUL, 0x9aec7676UL,
+     76              0x458fcacaUL, 0x9d1f8282UL, 0x4089c9c9UL, 0x87fa7d7dUL,
+     77              0x15effafaUL, 0xebb25959UL, 0xc98e4747UL, 0x0bfbf0f0UL,
+     78              0xec41adadUL, 0x67b3d4d4UL, 0xfd5fa2a2UL, 0xea45afafUL,
+     79              0xbf239c9cUL, 0xf753a4a4UL, 0x96e47272UL, 0x5b9bc0c0UL,
+     80              0xc275b7b7UL, 0x1ce1fdfdUL, 0xae3d9393UL, 0x6a4c2626UL,
+     81              0x5a6c3636UL, 0x417e3f3fUL, 0x02f5f7f7UL, 0x4f83ccccUL,
+     82              0x5c683434UL, 0xf451a5a5UL, 0x34d1e5e5UL, 0x08f9f1f1UL,
+     83              0x93e27171UL, 0x73abd8d8UL, 0x53623131UL, 0x3f2a1515UL,
+     84              0x0c080404UL, 0x5295c7c7UL, 0x65462323UL, 0x5e9dc3c3UL,
+     85              0x28301818UL, 0xa1379696UL, 0x0f0a0505UL, 0xb52f9a9aUL,
+     86              0x090e0707UL, 0x36241212UL, 0x9b1b8080UL, 0x3ddfe2e2UL,
+     87              0x26cdebebUL, 0x694e2727UL, 0xcd7fb2b2UL, 0x9fea7575UL,
+     88              0x1b120909UL, 0x9e1d8383UL, 0x74582c2cUL, 0x2e341a1aUL,
+     89              0x2d361b1bUL, 0xb2dc6e6eUL, 0xeeb45a5aUL, 0xfb5ba0a0UL,
+     90              0xf6a45252UL, 0x4d763b3bUL, 0x61b7d6d6UL, 0xce7db3b3UL,
+     91              0x7b522929UL, 0x3edde3e3UL, 0x715e2f2fUL, 0x97138484UL,
+     92              0xf5a65353UL, 0x68b9d1d1UL, 0x00000000UL, 0x2cc1ededUL,
+     93              0x60402020UL, 0x1fe3fcfcUL, 0xc879b1b1UL, 0xedb65b5bUL,
+     94              0xbed46a6aUL, 0x468dcbcbUL, 0xd967bebeUL, 0x4b723939UL,
+     95              0xde944a4aUL, 0xd4984c4cUL, 0xe8b05858UL, 0x4a85cfcfUL,
+     96              0x6bbbd0d0UL, 0x2ac5efefUL, 0xe54faaaaUL, 0x16edfbfbUL,
+     97              0xc5864343UL, 0xd79a4d4dUL, 0x55663333UL, 0x94118585UL,
+     98              0xcf8a4545UL, 0x10e9f9f9UL, 0x06040202UL, 0x81fe7f7fUL,
+     99              0xf0a05050UL, 0x44783c3cUL, 0xba259f9fUL, 0xe34ba8a8UL,
+    100              0xf3a25151UL, 0xfe5da3a3UL, 0xc0804040UL, 0x8a058f8fUL,
+    101              0xad3f9292UL, 0xbc219d9dUL, 0x48703838UL, 0x04f1f5f5UL,
+    102              0xdf63bcbcUL, 0xc177b6b6UL, 0x75afdadaUL, 0x63422121UL,
+    103              0x30201010UL, 0x1ae5ffffUL, 0x0efdf3f3UL, 0x6dbfd2d2UL,
+    104              0x4c81cdcdUL, 0x14180c0cUL, 0x35261313UL, 0x2fc3ececUL,
+    105              0xe1be5f5fUL, 0xa2359797UL, 0xcc884444UL, 0x392e1717UL,
+    106              0x5793c4c4UL, 0xf255a7a7UL, 0x82fc7e7eUL, 0x477a3d3dUL,
+    107              0xacc86464UL, 0xe7ba5d5dUL, 0x2b321919UL, 0x95e67373UL,
+    108              0xa0c06060UL, 0x98198181UL, 0xd19e4f4fUL, 0x7fa3dcdcUL,
+    109              0x66442222UL, 0x7e542a2aUL, 0xab3b9090UL, 0x830b8888UL,
+    110              0xca8c4646UL, 0x29c7eeeeUL, 0xd36bb8b8UL, 0x3c281414UL,
+    111              0x79a7dedeUL, 0xe2bc5e5eUL, 0x1d160b0bUL, 0x76addbdbUL,
+    112              0x3bdbe0e0UL, 0x56643232UL, 0x4e743a3aUL, 0x1e140a0aUL,
+    113              0xdb924949UL, 0x0a0c0606UL, 0x6c482424UL, 0xe4b85c5cUL,
+    114              0x5d9fc2c2UL, 0x6ebdd3d3UL, 0xef43acacUL, 0xa6c46262UL,
+    115              0xa8399191UL, 0xa4319595UL, 0x37d3e4e4UL, 0x8bf27979UL,
+    116              0x32d5e7e7UL, 0x438bc8c8UL, 0x596e3737UL, 0xb7da6d6dUL,
+    117              0x8c018d8dUL, 0x64b1d5d5UL, 0xd29c4e4eUL, 0xe049a9a9UL,
+    118              0xb4d86c6cUL, 0xfaac5656UL, 0x07f3f4f4UL, 0x25cfeaeaUL,
+    119              0xafca6565UL, 0x8ef47a7aUL, 0xe947aeaeUL, 0x18100808UL,
+    120              0xd56fbabaUL, 0x88f07878UL, 0x6f4a2525UL, 0x725c2e2eUL,
+    121              0x24381c1cUL, 0xf157a6a6UL, 0xc773b4b4UL, 0x5197c6c6UL,
+    122              0x23cbe8e8UL, 0x7ca1ddddUL, 0x9ce87474UL, 0x213e1f1fUL,
+    123              0xdd964b4bUL, 0xdc61bdbdUL, 0x860d8b8bUL, 0x850f8a8aUL,
+    124              0x90e07070UL, 0x427c3e3eUL, 0xc471b5b5UL, 0xaacc6666UL,
+    125              0xd8904848UL, 0x05060303UL, 0x01f7f6f6UL, 0x121c0e0eUL,
+    126              0xa3c26161UL, 0x5f6a3535UL, 0xf9ae5757UL, 0xd069b9b9UL,
+    127              0x91178686UL, 0x5899c1c1UL, 0x273a1d1dUL, 0xb9279e9eUL,
+    128              0x38d9e1e1UL, 0x13ebf8f8UL, 0xb32b9898UL, 0x33221111UL,
+    129              0xbbd26969UL, 0x70a9d9d9UL, 0x89078e8eUL, 0xa7339494UL,
+    130              0xb62d9b9bUL, 0x223c1e1eUL, 0x92158787UL, 0x20c9e9e9UL,
+    131              0x4987ceceUL, 0xffaa5555UL, 0x78502828UL, 0x7aa5dfdfUL,
+    132              0x8f038c8cUL, 0xf859a1a1UL, 0x80098989UL, 0x171a0d0dUL,
+    133              0xda65bfbfUL, 0x31d7e6e6UL, 0xc6844242UL, 0xb8d06868UL,
+    134              0xc3824141UL, 0xb0299999UL, 0x775a2d2dUL, 0x111e0f0fUL,
+    135              0xcb7bb0b0UL, 0xfca85454UL, 0xd66dbbbbUL, 0x3a2c1616UL,
+    136          };
+    137          static const unsigned int Te2[256] = {
+    138              0x63a5c663UL, 0x7c84f87cUL, 0x7799ee77UL, 0x7b8df67bUL,
+    139              0xf20dfff2UL, 0x6bbdd66bUL, 0x6fb1de6fUL, 0xc55491c5UL,
+    140              0x30506030UL, 0x01030201UL, 0x67a9ce67UL, 0x2b7d562bUL,
+    141              0xfe19e7feUL, 0xd762b5d7UL, 0xabe64dabUL, 0x769aec76UL,
+    142              0xca458fcaUL, 0x829d1f82UL, 0xc94089c9UL, 0x7d87fa7dUL,
+    143              0xfa15effaUL, 0x59ebb259UL, 0x47c98e47UL, 0xf00bfbf0UL,
+    144              0xadec41adUL, 0xd467b3d4UL, 0xa2fd5fa2UL, 0xafea45afUL,
+    145              0x9cbf239cUL, 0xa4f753a4UL, 0x7296e472UL, 0xc05b9bc0UL,
+    146              0xb7c275b7UL, 0xfd1ce1fdUL, 0x93ae3d93UL, 0x266a4c26UL,
+    147              0x365a6c36UL, 0x3f417e3fUL, 0xf702f5f7UL, 0xcc4f83ccUL,
+    148              0x345c6834UL, 0xa5f451a5UL, 0xe534d1e5UL, 0xf108f9f1UL,
+    149              0x7193e271UL, 0xd873abd8UL, 0x31536231UL, 0x153f2a15UL,
+    150              0x040c0804UL, 0xc75295c7UL, 0x23654623UL, 0xc35e9dc3UL,
+    151              0x18283018UL, 0x96a13796UL, 0x050f0a05UL, 0x9ab52f9aUL,
+    152              0x07090e07UL, 0x12362412UL, 0x809b1b80UL, 0xe23ddfe2UL,
+    153              0xeb26cdebUL, 0x27694e27UL, 0xb2cd7fb2UL, 0x759fea75UL,
+    154              0x091b1209UL, 0x839e1d83UL, 0x2c74582cUL, 0x1a2e341aUL,
+    155              0x1b2d361bUL, 0x6eb2dc6eUL, 0x5aeeb45aUL, 0xa0fb5ba0UL,
+    156              0x52f6a452UL, 0x3b4d763bUL, 0xd661b7d6UL, 0xb3ce7db3UL,
+    157              0x297b5229UL, 0xe33edde3UL, 0x2f715e2fUL, 0x84971384UL,
+    158              0x53f5a653UL, 0xd168b9d1UL, 0x00000000UL, 0xed2cc1edUL,
+    159              0x20604020UL, 0xfc1fe3fcUL, 0xb1c879b1UL, 0x5bedb65bUL,
+    160              0x6abed46aUL, 0xcb468dcbUL, 0xbed967beUL, 0x394b7239UL,
+    161              0x4ade944aUL, 0x4cd4984cUL, 0x58e8b058UL, 0xcf4a85cfUL,
+    162              0xd06bbbd0UL, 0xef2ac5efUL, 0xaae54faaUL, 0xfb16edfbUL,
+    163              0x43c58643UL, 0x4dd79a4dUL, 0x33556633UL, 0x85941185UL,
+    164              0x45cf8a45UL, 0xf910e9f9UL, 0x02060402UL, 0x7f81fe7fUL,
+    165              0x50f0a050UL, 0x3c44783cUL, 0x9fba259fUL, 0xa8e34ba8UL,
+    166              0x51f3a251UL, 0xa3fe5da3UL, 0x40c08040UL, 0x8f8a058fUL,
+    167              0x92ad3f92UL, 0x9dbc219dUL, 0x38487038UL, 0xf504f1f5UL,
+    168              0xbcdf63bcUL, 0xb6c177b6UL, 0xda75afdaUL, 0x21634221UL,
+    169              0x10302010UL, 0xff1ae5ffUL, 0xf30efdf3UL, 0xd26dbfd2UL,
+    170              0xcd4c81cdUL, 0x0c14180cUL, 0x13352613UL, 0xec2fc3ecUL,
+    171              0x5fe1be5fUL, 0x97a23597UL, 0x44cc8844UL, 0x17392e17UL,
+    172              0xc45793c4UL, 0xa7f255a7UL, 0x7e82fc7eUL, 0x3d477a3dUL,
+    173              0x64acc864UL, 0x5de7ba5dUL, 0x192b3219UL, 0x7395e673UL,
+    174              0x60a0c060UL, 0x81981981UL, 0x4fd19e4fUL, 0xdc7fa3dcUL,
+    175              0x22664422UL, 0x2a7e542aUL, 0x90ab3b90UL, 0x88830b88UL,
+    176              0x46ca8c46UL, 0xee29c7eeUL, 0xb8d36bb8UL, 0x143c2814UL,
+    177              0xde79a7deUL, 0x5ee2bc5eUL, 0x0b1d160bUL, 0xdb76addbUL,
+    178              0xe03bdbe0UL, 0x32566432UL, 0x3a4e743aUL, 0x0a1e140aUL,
+    179              0x49db9249UL, 0x060a0c06UL, 0x246c4824UL, 0x5ce4b85cUL,
+    180              0xc25d9fc2UL, 0xd36ebdd3UL, 0xacef43acUL, 0x62a6c462UL,
+    181              0x91a83991UL, 0x95a43195UL, 0xe437d3e4UL, 0x798bf279UL,
+    182              0xe732d5e7UL, 0xc8438bc8UL, 0x37596e37UL, 0x6db7da6dUL,
+    183              0x8d8c018dUL, 0xd564b1d5UL, 0x4ed29c4eUL, 0xa9e049a9UL,
+    184              0x6cb4d86cUL, 0x56faac56UL, 0xf407f3f4UL, 0xea25cfeaUL,
+    185              0x65afca65UL, 0x7a8ef47aUL, 0xaee947aeUL, 0x08181008UL,
+    186              0xbad56fbaUL, 0x7888f078UL, 0x256f4a25UL, 0x2e725c2eUL,
+    187              0x1c24381cUL, 0xa6f157a6UL, 0xb4c773b4UL, 0xc65197c6UL,
+    188              0xe823cbe8UL, 0xdd7ca1ddUL, 0x749ce874UL, 0x1f213e1fUL,
+    189              0x4bdd964bUL, 0xbddc61bdUL, 0x8b860d8bUL, 0x8a850f8aUL,
+    190              0x7090e070UL, 0x3e427c3eUL, 0xb5c471b5UL, 0x66aacc66UL,
+    191              0x48d89048UL, 0x03050603UL, 0xf601f7f6UL, 0x0e121c0eUL,
+    192              0x61a3c261UL, 0x355f6a35UL, 0x57f9ae57UL, 0xb9d069b9UL,
+    193              0x86911786UL, 0xc15899c1UL, 0x1d273a1dUL, 0x9eb9279eUL,
+    194              0xe138d9e1UL, 0xf813ebf8UL, 0x98b32b98UL, 0x11332211UL,
+    195              0x69bbd269UL, 0xd970a9d9UL, 0x8e89078eUL, 0x94a73394UL,
+    196              0x9bb62d9bUL, 0x1e223c1eUL, 0x87921587UL, 0xe920c9e9UL,
+    197              0xce4987ceUL, 0x55ffaa55UL, 0x28785028UL, 0xdf7aa5dfUL,
+    198              0x8c8f038cUL, 0xa1f859a1UL, 0x89800989UL, 0x0d171a0dUL,
+    199              0xbfda65bfUL, 0xe631d7e6UL, 0x42c68442UL, 0x68b8d068UL,
+    200              0x41c38241UL, 0x99b02999UL, 0x2d775a2dUL, 0x0f111e0fUL,
+    201              0xb0cb7bb0UL, 0x54fca854UL, 0xbbd66dbbUL, 0x163a2c16UL,
+    202          };
+    203          static const unsigned int Te3[256] = {
+    204              0x6363a5c6UL, 0x7c7c84f8UL, 0x777799eeUL, 0x7b7b8df6UL,
+    205              0xf2f20dffUL, 0x6b6bbdd6UL, 0x6f6fb1deUL, 0xc5c55491UL,
+    206              0x30305060UL, 0x01010302UL, 0x6767a9ceUL, 0x2b2b7d56UL,
+    207              0xfefe19e7UL, 0xd7d762b5UL, 0xababe64dUL, 0x76769aecUL,
+    208              0xcaca458fUL, 0x82829d1fUL, 0xc9c94089UL, 0x7d7d87faUL,
+    209              0xfafa15efUL, 0x5959ebb2UL, 0x4747c98eUL, 0xf0f00bfbUL,
+    210              0xadadec41UL, 0xd4d467b3UL, 0xa2a2fd5fUL, 0xafafea45UL,
+    211              0x9c9cbf23UL, 0xa4a4f753UL, 0x727296e4UL, 0xc0c05b9bUL,
+    212              0xb7b7c275UL, 0xfdfd1ce1UL, 0x9393ae3dUL, 0x26266a4cUL,
+    213              0x36365a6cUL, 0x3f3f417eUL, 0xf7f702f5UL, 0xcccc4f83UL,
+    214              0x34345c68UL, 0xa5a5f451UL, 0xe5e534d1UL, 0xf1f108f9UL,
+    215              0x717193e2UL, 0xd8d873abUL, 0x31315362UL, 0x15153f2aUL,
+    216              0x04040c08UL, 0xc7c75295UL, 0x23236546UL, 0xc3c35e9dUL,
+    217              0x18182830UL, 0x9696a137UL, 0x05050f0aUL, 0x9a9ab52fUL,
+    218              0x0707090eUL, 0x12123624UL, 0x80809b1bUL, 0xe2e23ddfUL,
+    219              0xebeb26cdUL, 0x2727694eUL, 0xb2b2cd7fUL, 0x75759feaUL,
+    220              0x09091b12UL, 0x83839e1dUL, 0x2c2c7458UL, 0x1a1a2e34UL,
+    221              0x1b1b2d36UL, 0x6e6eb2dcUL, 0x5a5aeeb4UL, 0xa0a0fb5bUL,
+    222              0x5252f6a4UL, 0x3b3b4d76UL, 0xd6d661b7UL, 0xb3b3ce7dUL,
+    223              0x29297b52UL, 0xe3e33eddUL, 0x2f2f715eUL, 0x84849713UL,
+    224              0x5353f5a6UL, 0xd1d168b9UL, 0x00000000UL, 0xeded2cc1UL,
+    225              0x20206040UL, 0xfcfc1fe3UL, 0xb1b1c879UL, 0x5b5bedb6UL,
+    226              0x6a6abed4UL, 0xcbcb468dUL, 0xbebed967UL, 0x39394b72UL,
+    227              0x4a4ade94UL, 0x4c4cd498UL, 0x5858e8b0UL, 0xcfcf4a85UL,
+    228              0xd0d06bbbUL, 0xefef2ac5UL, 0xaaaae54fUL, 0xfbfb16edUL,
+    229              0x4343c586UL, 0x4d4dd79aUL, 0x33335566UL, 0x85859411UL,
+    230              0x4545cf8aUL, 0xf9f910e9UL, 0x02020604UL, 0x7f7f81feUL,
+    231              0x5050f0a0UL, 0x3c3c4478UL, 0x9f9fba25UL, 0xa8a8e34bUL,
+    232              0x5151f3a2UL, 0xa3a3fe5dUL, 0x4040c080UL, 0x8f8f8a05UL,
+    233              0x9292ad3fUL, 0x9d9dbc21UL, 0x38384870UL, 0xf5f504f1UL,
+    234              0xbcbcdf63UL, 0xb6b6c177UL, 0xdada75afUL, 0x21216342UL,
+    235              0x10103020UL, 0xffff1ae5UL, 0xf3f30efdUL, 0xd2d26dbfUL,
+    236              0xcdcd4c81UL, 0x0c0c1418UL, 0x13133526UL, 0xecec2fc3UL,
+    237              0x5f5fe1beUL, 0x9797a235UL, 0x4444cc88UL, 0x1717392eUL,
+    238              0xc4c45793UL, 0xa7a7f255UL, 0x7e7e82fcUL, 0x3d3d477aUL,
+    239              0x6464acc8UL, 0x5d5de7baUL, 0x19192b32UL, 0x737395e6UL,
+    240              0x6060a0c0UL, 0x81819819UL, 0x4f4fd19eUL, 0xdcdc7fa3UL,
+    241              0x22226644UL, 0x2a2a7e54UL, 0x9090ab3bUL, 0x8888830bUL,
+    242              0x4646ca8cUL, 0xeeee29c7UL, 0xb8b8d36bUL, 0x14143c28UL,
+    243              0xdede79a7UL, 0x5e5ee2bcUL, 0x0b0b1d16UL, 0xdbdb76adUL,
+    244              0xe0e03bdbUL, 0x32325664UL, 0x3a3a4e74UL, 0x0a0a1e14UL,
+    245              0x4949db92UL, 0x06060a0cUL, 0x24246c48UL, 0x5c5ce4b8UL,
+    246              0xc2c25d9fUL, 0xd3d36ebdUL, 0xacacef43UL, 0x6262a6c4UL,
+    247              0x9191a839UL, 0x9595a431UL, 0xe4e437d3UL, 0x79798bf2UL,
+    248              0xe7e732d5UL, 0xc8c8438bUL, 0x3737596eUL, 0x6d6db7daUL,
+    249              0x8d8d8c01UL, 0xd5d564b1UL, 0x4e4ed29cUL, 0xa9a9e049UL,
+    250              0x6c6cb4d8UL, 0x5656faacUL, 0xf4f407f3UL, 0xeaea25cfUL,
+    251              0x6565afcaUL, 0x7a7a8ef4UL, 0xaeaee947UL, 0x08081810UL,
+    252              0xbabad56fUL, 0x787888f0UL, 0x25256f4aUL, 0x2e2e725cUL,
+    253              0x1c1c2438UL, 0xa6a6f157UL, 0xb4b4c773UL, 0xc6c65197UL,
+    254              0xe8e823cbUL, 0xdddd7ca1UL, 0x74749ce8UL, 0x1f1f213eUL,
+    255              0x4b4bdd96UL, 0xbdbddc61UL, 0x8b8b860dUL, 0x8a8a850fUL,
+    256              0x707090e0UL, 0x3e3e427cUL, 0xb5b5c471UL, 0x6666aaccUL,
+    257              0x4848d890UL, 0x03030506UL, 0xf6f601f7UL, 0x0e0e121cUL,
+    258              0x6161a3c2UL, 0x35355f6aUL, 0x5757f9aeUL, 0xb9b9d069UL,
+    259              0x86869117UL, 0xc1c15899UL, 0x1d1d273aUL, 0x9e9eb927UL,
+    260              0xe1e138d9UL, 0xf8f813ebUL, 0x9898b32bUL, 0x11113322UL,
+    261              0x6969bbd2UL, 0xd9d970a9UL, 0x8e8e8907UL, 0x9494a733UL,
+    262              0x9b9bb62dUL, 0x1e1e223cUL, 0x87879215UL, 0xe9e920c9UL,
+    263              0xcece4987UL, 0x5555ffaaUL, 0x28287850UL, 0xdfdf7aa5UL,
+    264              0x8c8c8f03UL, 0xa1a1f859UL, 0x89898009UL, 0x0d0d171aUL,
+    265              0xbfbfda65UL, 0xe6e631d7UL, 0x4242c684UL, 0x6868b8d0UL,
+    266              0x4141c382UL, 0x9999b029UL, 0x2d2d775aUL, 0x0f0f111eUL,
+    267              0xb0b0cb7bUL, 0x5454fca8UL, 0xbbbbd66dUL, 0x16163a2cUL,
+    268          };
+    269          static const unsigned int Te4[256] = {
+    270              0x63636363UL, 0x7c7c7c7cUL, 0x77777777UL, 0x7b7b7b7bUL,
+    271              0xf2f2f2f2UL, 0x6b6b6b6bUL, 0x6f6f6f6fUL, 0xc5c5c5c5UL,
+    272              0x30303030UL, 0x01010101UL, 0x67676767UL, 0x2b2b2b2bUL,
+    273              0xfefefefeUL, 0xd7d7d7d7UL, 0xababababUL, 0x76767676UL,
+    274              0xcacacacaUL, 0x82828282UL, 0xc9c9c9c9UL, 0x7d7d7d7dUL,
+    275              0xfafafafaUL, 0x59595959UL, 0x47474747UL, 0xf0f0f0f0UL,
+    276              0xadadadadUL, 0xd4d4d4d4UL, 0xa2a2a2a2UL, 0xafafafafUL,
+    277              0x9c9c9c9cUL, 0xa4a4a4a4UL, 0x72727272UL, 0xc0c0c0c0UL,
+    278              0xb7b7b7b7UL, 0xfdfdfdfdUL, 0x93939393UL, 0x26262626UL,
+    279              0x36363636UL, 0x3f3f3f3fUL, 0xf7f7f7f7UL, 0xccccccccUL,
+    280              0x34343434UL, 0xa5a5a5a5UL, 0xe5e5e5e5UL, 0xf1f1f1f1UL,
+    281              0x71717171UL, 0xd8d8d8d8UL, 0x31313131UL, 0x15151515UL,
+    282              0x04040404UL, 0xc7c7c7c7UL, 0x23232323UL, 0xc3c3c3c3UL,
+    283              0x18181818UL, 0x96969696UL, 0x05050505UL, 0x9a9a9a9aUL,
+    284              0x07070707UL, 0x12121212UL, 0x80808080UL, 0xe2e2e2e2UL,
+    285              0xebebebebUL, 0x27272727UL, 0xb2b2b2b2UL, 0x75757575UL,
+    286              0x09090909UL, 0x83838383UL, 0x2c2c2c2cUL, 0x1a1a1a1aUL,
+    287              0x1b1b1b1bUL, 0x6e6e6e6eUL, 0x5a5a5a5aUL, 0xa0a0a0a0UL,
+    288              0x52525252UL, 0x3b3b3b3bUL, 0xd6d6d6d6UL, 0xb3b3b3b3UL,
+    289              0x29292929UL, 0xe3e3e3e3UL, 0x2f2f2f2fUL, 0x84848484UL,
+    290              0x53535353UL, 0xd1d1d1d1UL, 0x00000000UL, 0xededededUL,
+    291              0x20202020UL, 0xfcfcfcfcUL, 0xb1b1b1b1UL, 0x5b5b5b5bUL,
+    292              0x6a6a6a6aUL, 0xcbcbcbcbUL, 0xbebebebeUL, 0x39393939UL,
+    293              0x4a4a4a4aUL, 0x4c4c4c4cUL, 0x58585858UL, 0xcfcfcfcfUL,
+    294              0xd0d0d0d0UL, 0xefefefefUL, 0xaaaaaaaaUL, 0xfbfbfbfbUL,
+    295              0x43434343UL, 0x4d4d4d4dUL, 0x33333333UL, 0x85858585UL,
+    296              0x45454545UL, 0xf9f9f9f9UL, 0x02020202UL, 0x7f7f7f7fUL,
+    297              0x50505050UL, 0x3c3c3c3cUL, 0x9f9f9f9fUL, 0xa8a8a8a8UL,
+    298              0x51515151UL, 0xa3a3a3a3UL, 0x40404040UL, 0x8f8f8f8fUL,
+    299              0x92929292UL, 0x9d9d9d9dUL, 0x38383838UL, 0xf5f5f5f5UL,
+    300              0xbcbcbcbcUL, 0xb6b6b6b6UL, 0xdadadadaUL, 0x21212121UL,
+    301              0x10101010UL, 0xffffffffUL, 0xf3f3f3f3UL, 0xd2d2d2d2UL,
+    302              0xcdcdcdcdUL, 0x0c0c0c0cUL, 0x13131313UL, 0xececececUL,
+    303              0x5f5f5f5fUL, 0x97979797UL, 0x44444444UL, 0x17171717UL,
+    304              0xc4c4c4c4UL, 0xa7a7a7a7UL, 0x7e7e7e7eUL, 0x3d3d3d3dUL,
+    305              0x64646464UL, 0x5d5d5d5dUL, 0x19191919UL, 0x73737373UL,
+    306              0x60606060UL, 0x81818181UL, 0x4f4f4f4fUL, 0xdcdcdcdcUL,
+    307              0x22222222UL, 0x2a2a2a2aUL, 0x90909090UL, 0x88888888UL,
+    308              0x46464646UL, 0xeeeeeeeeUL, 0xb8b8b8b8UL, 0x14141414UL,
+    309              0xdedededeUL, 0x5e5e5e5eUL, 0x0b0b0b0bUL, 0xdbdbdbdbUL,
+    310              0xe0e0e0e0UL, 0x32323232UL, 0x3a3a3a3aUL, 0x0a0a0a0aUL,
+    311              0x49494949UL, 0x06060606UL, 0x24242424UL, 0x5c5c5c5cUL,
+    312              0xc2c2c2c2UL, 0xd3d3d3d3UL, 0xacacacacUL, 0x62626262UL,
+    313              0x91919191UL, 0x95959595UL, 0xe4e4e4e4UL, 0x79797979UL,
+    314              0xe7e7e7e7UL, 0xc8c8c8c8UL, 0x37373737UL, 0x6d6d6d6dUL,
+    315              0x8d8d8d8dUL, 0xd5d5d5d5UL, 0x4e4e4e4eUL, 0xa9a9a9a9UL,
+    316              0x6c6c6c6cUL, 0x56565656UL, 0xf4f4f4f4UL, 0xeaeaeaeaUL,
+    317              0x65656565UL, 0x7a7a7a7aUL, 0xaeaeaeaeUL, 0x08080808UL,
+    318              0xbabababaUL, 0x78787878UL, 0x25252525UL, 0x2e2e2e2eUL,
+    319              0x1c1c1c1cUL, 0xa6a6a6a6UL, 0xb4b4b4b4UL, 0xc6c6c6c6UL,
+    320              0xe8e8e8e8UL, 0xddddddddUL, 0x74747474UL, 0x1f1f1f1fUL,
+    321              0x4b4b4b4bUL, 0xbdbdbdbdUL, 0x8b8b8b8bUL, 0x8a8a8a8aUL,
+    322              0x70707070UL, 0x3e3e3e3eUL, 0xb5b5b5b5UL, 0x66666666UL,
+    323              0x48484848UL, 0x03030303UL, 0xf6f6f6f6UL, 0x0e0e0e0eUL,
+    324              0x61616161UL, 0x35353535UL, 0x57575757UL, 0xb9b9b9b9UL,
+    325              0x86868686UL, 0xc1c1c1c1UL, 0x1d1d1d1dUL, 0x9e9e9e9eUL,
+    326              0xe1e1e1e1UL, 0xf8f8f8f8UL, 0x98989898UL, 0x11111111UL,
+    327              0x69696969UL, 0xd9d9d9d9UL, 0x8e8e8e8eUL, 0x94949494UL,
+    328              0x9b9b9b9bUL, 0x1e1e1e1eUL, 0x87878787UL, 0xe9e9e9e9UL,
+    329              0xcecececeUL, 0x55555555UL, 0x28282828UL, 0xdfdfdfdfUL,
+    330              0x8c8c8c8cUL, 0xa1a1a1a1UL, 0x89898989UL, 0x0d0d0d0dUL,
+    331              0xbfbfbfbfUL, 0xe6e6e6e6UL, 0x42424242UL, 0x68686868UL,
+    332              0x41414141UL, 0x99999999UL, 0x2d2d2d2dUL, 0x0f0f0f0fUL,
+    333              0xb0b0b0b0UL, 0x54545454UL, 0xbbbbbbbbUL, 0x16161616UL,
+    334          };
+    335          static const unsigned int Td0[256] = {
+    336              0x51f4a750UL, 0x7e416553UL, 0x1a17a4c3UL, 0x3a275e96UL,
+    337              0x3bab6bcbUL, 0x1f9d45f1UL, 0xacfa58abUL, 0x4be30393UL,
+    338              0x2030fa55UL, 0xad766df6UL, 0x88cc7691UL, 0xf5024c25UL,
+    339              0x4fe5d7fcUL, 0xc52acbd7UL, 0x26354480UL, 0xb562a38fUL,
+    340              0xdeb15a49UL, 0x25ba1b67UL, 0x45ea0e98UL, 0x5dfec0e1UL,
+    341              0xc32f7502UL, 0x814cf012UL, 0x8d4697a3UL, 0x6bd3f9c6UL,
+    342              0x038f5fe7UL, 0x15929c95UL, 0xbf6d7aebUL, 0x955259daUL,
+    343              0xd4be832dUL, 0x587421d3UL, 0x49e06929UL, 0x8ec9c844UL,
+    344              0x75c2896aUL, 0xf48e7978UL, 0x99583e6bUL, 0x27b971ddUL,
+    345              0xbee14fb6UL, 0xf088ad17UL, 0xc920ac66UL, 0x7dce3ab4UL,
+    346              0x63df4a18UL, 0xe51a3182UL, 0x97513360UL, 0x62537f45UL,
+    347              0xb16477e0UL, 0xbb6bae84UL, 0xfe81a01cUL, 0xf9082b94UL,
+    348              0x70486858UL, 0x8f45fd19UL, 0x94de6c87UL, 0x527bf8b7UL,
+    349              0xab73d323UL, 0x724b02e2UL, 0xe31f8f57UL, 0x6655ab2aUL,
+    350              0xb2eb2807UL, 0x2fb5c203UL, 0x86c57b9aUL, 0xd33708a5UL,
+    351              0x302887f2UL, 0x23bfa5b2UL, 0x02036abaUL, 0xed16825cUL,
+    352              0x8acf1c2bUL, 0xa779b492UL, 0xf307f2f0UL, 0x4e69e2a1UL,
+    353              0x65daf4cdUL, 0x0605bed5UL, 0xd134621fUL, 0xc4a6fe8aUL,
+    354              0x342e539dUL, 0xa2f355a0UL, 0x058ae132UL, 0xa4f6eb75UL,
+    355              0x0b83ec39UL, 0x4060efaaUL, 0x5e719f06UL, 0xbd6e1051UL,
+    356              0x3e218af9UL, 0x96dd063dUL, 0xdd3e05aeUL, 0x4de6bd46UL,
+    357              0x91548db5UL, 0x71c45d05UL, 0x0406d46fUL, 0x605015ffUL,
+    358              0x1998fb24UL, 0xd6bde997UL, 0x894043ccUL, 0x67d99e77UL,
+    359              0xb0e842bdUL, 0x07898b88UL, 0xe7195b38UL, 0x79c8eedbUL,
+    360              0xa17c0a47UL, 0x7c420fe9UL, 0xf8841ec9UL, 0x00000000UL,
+    361              0x09808683UL, 0x322bed48UL, 0x1e1170acUL, 0x6c5a724eUL,
+    362              0xfd0efffbUL, 0x0f853856UL, 0x3daed51eUL, 0x362d3927UL,
+    363              0x0a0fd964UL, 0x685ca621UL, 0x9b5b54d1UL, 0x24362e3aUL,
+    364              0x0c0a67b1UL, 0x9357e70fUL, 0xb4ee96d2UL, 0x1b9b919eUL,
+    365              0x80c0c54fUL, 0x61dc20a2UL, 0x5a774b69UL, 0x1c121a16UL,
+    366              0xe293ba0aUL, 0xc0a02ae5UL, 0x3c22e043UL, 0x121b171dUL,
+    367              0x0e090d0bUL, 0xf28bc7adUL, 0x2db6a8b9UL, 0x141ea9c8UL,
+    368              0x57f11985UL, 0xaf75074cUL, 0xee99ddbbUL, 0xa37f60fdUL,
+    369              0xf701269fUL, 0x5c72f5bcUL, 0x44663bc5UL, 0x5bfb7e34UL,
+    370              0x8b432976UL, 0xcb23c6dcUL, 0xb6edfc68UL, 0xb8e4f163UL,
+    371              0xd731dccaUL, 0x42638510UL, 0x13972240UL, 0x84c61120UL,
+    372              0x854a247dUL, 0xd2bb3df8UL, 0xaef93211UL, 0xc729a16dUL,
+    373              0x1d9e2f4bUL, 0xdcb230f3UL, 0x0d8652ecUL, 0x77c1e3d0UL,
+    374              0x2bb3166cUL, 0xa970b999UL, 0x119448faUL, 0x47e96422UL,
+    375              0xa8fc8cc4UL, 0xa0f03f1aUL, 0x567d2cd8UL, 0x223390efUL,
+    376              0x87494ec7UL, 0xd938d1c1UL, 0x8ccaa2feUL, 0x98d40b36UL,
+    377              0xa6f581cfUL, 0xa57ade28UL, 0xdab78e26UL, 0x3fadbfa4UL,
+    378              0x2c3a9de4UL, 0x5078920dUL, 0x6a5fcc9bUL, 0x547e4662UL,
+    379              0xf68d13c2UL, 0x90d8b8e8UL, 0x2e39f75eUL, 0x82c3aff5UL,
+    380              0x9f5d80beUL, 0x69d0937cUL, 0x6fd52da9UL, 0xcf2512b3UL,
+    381              0xc8ac993bUL, 0x10187da7UL, 0xe89c636eUL, 0xdb3bbb7bUL,
+    382              0xcd267809UL, 0x6e5918f4UL, 0xec9ab701UL, 0x834f9aa8UL,
+    383              0xe6956e65UL, 0xaaffe67eUL, 0x21bccf08UL, 0xef15e8e6UL,
+    384              0xbae79bd9UL, 0x4a6f36ceUL, 0xea9f09d4UL, 0x29b07cd6UL,
+    385              0x31a4b2afUL, 0x2a3f2331UL, 0xc6a59430UL, 0x35a266c0UL,
+    386              0x744ebc37UL, 0xfc82caa6UL, 0xe090d0b0UL, 0x33a7d815UL,
+    387              0xf104984aUL, 0x41ecdaf7UL, 0x7fcd500eUL, 0x1791f62fUL,
+    388              0x764dd68dUL, 0x43efb04dUL, 0xccaa4d54UL, 0xe49604dfUL,
+    389              0x9ed1b5e3UL, 0x4c6a881bUL, 0xc12c1fb8UL, 0x4665517fUL,
+    390              0x9d5eea04UL, 0x018c355dUL, 0xfa877473UL, 0xfb0b412eUL,
+    391              0xb3671d5aUL, 0x92dbd252UL, 0xe9105633UL, 0x6dd64713UL,
+    392              0x9ad7618cUL, 0x37a10c7aUL, 0x59f8148eUL, 0xeb133c89UL,
+    393              0xcea927eeUL, 0xb761c935UL, 0xe11ce5edUL, 0x7a47b13cUL,
+    394              0x9cd2df59UL, 0x55f2733fUL, 0x1814ce79UL, 0x73c737bfUL,
+    395              0x53f7cdeaUL, 0x5ffdaa5bUL, 0xdf3d6f14UL, 0x7844db86UL,
+    396              0xcaaff381UL, 0xb968c43eUL, 0x3824342cUL, 0xc2a3405fUL,
+    397              0x161dc372UL, 0xbce2250cUL, 0x283c498bUL, 0xff0d9541UL,
+    398              0x39a80171UL, 0x080cb3deUL, 0xd8b4e49cUL, 0x6456c190UL,
+    399              0x7bcb8461UL, 0xd532b670UL, 0x486c5c74UL, 0xd0b85742UL,
+    400          };
+    401          static const unsigned int Td1[256] = {
+    402              0x5051f4a7UL, 0x537e4165UL, 0xc31a17a4UL, 0x963a275eUL,
+    403              0xcb3bab6bUL, 0xf11f9d45UL, 0xabacfa58UL, 0x934be303UL,
+    404              0x552030faUL, 0xf6ad766dUL, 0x9188cc76UL, 0x25f5024cUL,
+    405              0xfc4fe5d7UL, 0xd7c52acbUL, 0x80263544UL, 0x8fb562a3UL,
+    406              0x49deb15aUL, 0x6725ba1bUL, 0x9845ea0eUL, 0xe15dfec0UL,
+    407              0x02c32f75UL, 0x12814cf0UL, 0xa38d4697UL, 0xc66bd3f9UL,
+    408              0xe7038f5fUL, 0x9515929cUL, 0xebbf6d7aUL, 0xda955259UL,
+    409              0x2dd4be83UL, 0xd3587421UL, 0x2949e069UL, 0x448ec9c8UL,
+    410              0x6a75c289UL, 0x78f48e79UL, 0x6b99583eUL, 0xdd27b971UL,
+    411              0xb6bee14fUL, 0x17f088adUL, 0x66c920acUL, 0xb47dce3aUL,
+    412              0x1863df4aUL, 0x82e51a31UL, 0x60975133UL, 0x4562537fUL,
+    413              0xe0b16477UL, 0x84bb6baeUL, 0x1cfe81a0UL, 0x94f9082bUL,
+    414              0x58704868UL, 0x198f45fdUL, 0x8794de6cUL, 0xb7527bf8UL,
+    415              0x23ab73d3UL, 0xe2724b02UL, 0x57e31f8fUL, 0x2a6655abUL,
+    416              0x07b2eb28UL, 0x032fb5c2UL, 0x9a86c57bUL, 0xa5d33708UL,
+    417              0xf2302887UL, 0xb223bfa5UL, 0xba02036aUL, 0x5ced1682UL,
+    418              0x2b8acf1cUL, 0x92a779b4UL, 0xf0f307f2UL, 0xa14e69e2UL,
+    419              0xcd65daf4UL, 0xd50605beUL, 0x1fd13462UL, 0x8ac4a6feUL,
+    420              0x9d342e53UL, 0xa0a2f355UL, 0x32058ae1UL, 0x75a4f6ebUL,
+    421              0x390b83ecUL, 0xaa4060efUL, 0x065e719fUL, 0x51bd6e10UL,
+    422              0xf93e218aUL, 0x3d96dd06UL, 0xaedd3e05UL, 0x464de6bdUL,
+    423              0xb591548dUL, 0x0571c45dUL, 0x6f0406d4UL, 0xff605015UL,
+    424              0x241998fbUL, 0x97d6bde9UL, 0xcc894043UL, 0x7767d99eUL,
+    425              0xbdb0e842UL, 0x8807898bUL, 0x38e7195bUL, 0xdb79c8eeUL,
+    426              0x47a17c0aUL, 0xe97c420fUL, 0xc9f8841eUL, 0x00000000UL,
+    427              0x83098086UL, 0x48322bedUL, 0xac1e1170UL, 0x4e6c5a72UL,
+    428              0xfbfd0effUL, 0x560f8538UL, 0x1e3daed5UL, 0x27362d39UL,
+    429              0x640a0fd9UL, 0x21685ca6UL, 0xd19b5b54UL, 0x3a24362eUL,
+    430              0xb10c0a67UL, 0x0f9357e7UL, 0xd2b4ee96UL, 0x9e1b9b91UL,
+    431              0x4f80c0c5UL, 0xa261dc20UL, 0x695a774bUL, 0x161c121aUL,
+    432              0x0ae293baUL, 0xe5c0a02aUL, 0x433c22e0UL, 0x1d121b17UL,
+    433              0x0b0e090dUL, 0xadf28bc7UL, 0xb92db6a8UL, 0xc8141ea9UL,
+    434              0x8557f119UL, 0x4caf7507UL, 0xbbee99ddUL, 0xfda37f60UL,
+    435              0x9ff70126UL, 0xbc5c72f5UL, 0xc544663bUL, 0x345bfb7eUL,
+    436              0x768b4329UL, 0xdccb23c6UL, 0x68b6edfcUL, 0x63b8e4f1UL,
+    437              0xcad731dcUL, 0x10426385UL, 0x40139722UL, 0x2084c611UL,
+    438              0x7d854a24UL, 0xf8d2bb3dUL, 0x11aef932UL, 0x6dc729a1UL,
+    439              0x4b1d9e2fUL, 0xf3dcb230UL, 0xec0d8652UL, 0xd077c1e3UL,
+    440              0x6c2bb316UL, 0x99a970b9UL, 0xfa119448UL, 0x2247e964UL,
+    441              0xc4a8fc8cUL, 0x1aa0f03fUL, 0xd8567d2cUL, 0xef223390UL,
+    442              0xc787494eUL, 0xc1d938d1UL, 0xfe8ccaa2UL, 0x3698d40bUL,
+    443              0xcfa6f581UL, 0x28a57adeUL, 0x26dab78eUL, 0xa43fadbfUL,
+    444              0xe42c3a9dUL, 0x0d507892UL, 0x9b6a5fccUL, 0x62547e46UL,
+    445              0xc2f68d13UL, 0xe890d8b8UL, 0x5e2e39f7UL, 0xf582c3afUL,
+    446              0xbe9f5d80UL, 0x7c69d093UL, 0xa96fd52dUL, 0xb3cf2512UL,
+    447              0x3bc8ac99UL, 0xa710187dUL, 0x6ee89c63UL, 0x7bdb3bbbUL,
+    448              0x09cd2678UL, 0xf46e5918UL, 0x01ec9ab7UL, 0xa8834f9aUL,
+    449              0x65e6956eUL, 0x7eaaffe6UL, 0x0821bccfUL, 0xe6ef15e8UL,
+    450              0xd9bae79bUL, 0xce4a6f36UL, 0xd4ea9f09UL, 0xd629b07cUL,
+    451              0xaf31a4b2UL, 0x312a3f23UL, 0x30c6a594UL, 0xc035a266UL,
+    452              0x37744ebcUL, 0xa6fc82caUL, 0xb0e090d0UL, 0x1533a7d8UL,
+    453              0x4af10498UL, 0xf741ecdaUL, 0x0e7fcd50UL, 0x2f1791f6UL,
+    454              0x8d764dd6UL, 0x4d43efb0UL, 0x54ccaa4dUL, 0xdfe49604UL,
+    455              0xe39ed1b5UL, 0x1b4c6a88UL, 0xb8c12c1fUL, 0x7f466551UL,
+    456              0x049d5eeaUL, 0x5d018c35UL, 0x73fa8774UL, 0x2efb0b41UL,
+    457              0x5ab3671dUL, 0x5292dbd2UL, 0x33e91056UL, 0x136dd647UL,
+    458              0x8c9ad761UL, 0x7a37a10cUL, 0x8e59f814UL, 0x89eb133cUL,
+    459              0xeecea927UL, 0x35b761c9UL, 0xede11ce5UL, 0x3c7a47b1UL,
+    460              0x599cd2dfUL, 0x3f55f273UL, 0x791814ceUL, 0xbf73c737UL,
+    461              0xea53f7cdUL, 0x5b5ffdaaUL, 0x14df3d6fUL, 0x867844dbUL,
+    462              0x81caaff3UL, 0x3eb968c4UL, 0x2c382434UL, 0x5fc2a340UL,
+    463              0x72161dc3UL, 0x0cbce225UL, 0x8b283c49UL, 0x41ff0d95UL,
+    464              0x7139a801UL, 0xde080cb3UL, 0x9cd8b4e4UL, 0x906456c1UL,
+    465              0x617bcb84UL, 0x70d532b6UL, 0x74486c5cUL, 0x42d0b857UL,
+    466          };
+    467          static const unsigned int Td2[256] = {
+    468              0xa75051f4UL, 0x65537e41UL, 0xa4c31a17UL, 0x5e963a27UL,
+    469              0x6bcb3babUL, 0x45f11f9dUL, 0x58abacfaUL, 0x03934be3UL,
+    470              0xfa552030UL, 0x6df6ad76UL, 0x769188ccUL, 0x4c25f502UL,
+    471              0xd7fc4fe5UL, 0xcbd7c52aUL, 0x44802635UL, 0xa38fb562UL,
+    472              0x5a49deb1UL, 0x1b6725baUL, 0x0e9845eaUL, 0xc0e15dfeUL,
+    473              0x7502c32fUL, 0xf012814cUL, 0x97a38d46UL, 0xf9c66bd3UL,
+    474              0x5fe7038fUL, 0x9c951592UL, 0x7aebbf6dUL, 0x59da9552UL,
+    475              0x832dd4beUL, 0x21d35874UL, 0x692949e0UL, 0xc8448ec9UL,
+    476              0x896a75c2UL, 0x7978f48eUL, 0x3e6b9958UL, 0x71dd27b9UL,
+    477              0x4fb6bee1UL, 0xad17f088UL, 0xac66c920UL, 0x3ab47dceUL,
+    478              0x4a1863dfUL, 0x3182e51aUL, 0x33609751UL, 0x7f456253UL,
+    479              0x77e0b164UL, 0xae84bb6bUL, 0xa01cfe81UL, 0x2b94f908UL,
+    480              0x68587048UL, 0xfd198f45UL, 0x6c8794deUL, 0xf8b7527bUL,
+    481              0xd323ab73UL, 0x02e2724bUL, 0x8f57e31fUL, 0xab2a6655UL,
+    482              0x2807b2ebUL, 0xc2032fb5UL, 0x7b9a86c5UL, 0x08a5d337UL,
+    483              0x87f23028UL, 0xa5b223bfUL, 0x6aba0203UL, 0x825ced16UL,
+    484              0x1c2b8acfUL, 0xb492a779UL, 0xf2f0f307UL, 0xe2a14e69UL,
+    485              0xf4cd65daUL, 0xbed50605UL, 0x621fd134UL, 0xfe8ac4a6UL,
+    486              0x539d342eUL, 0x55a0a2f3UL, 0xe132058aUL, 0xeb75a4f6UL,
+    487              0xec390b83UL, 0xefaa4060UL, 0x9f065e71UL, 0x1051bd6eUL,
+    488              0x8af93e21UL, 0x063d96ddUL, 0x05aedd3eUL, 0xbd464de6UL,
+    489              0x8db59154UL, 0x5d0571c4UL, 0xd46f0406UL, 0x15ff6050UL,
+    490              0xfb241998UL, 0xe997d6bdUL, 0x43cc8940UL, 0x9e7767d9UL,
+    491              0x42bdb0e8UL, 0x8b880789UL, 0x5b38e719UL, 0xeedb79c8UL,
+    492              0x0a47a17cUL, 0x0fe97c42UL, 0x1ec9f884UL, 0x00000000UL,
+    493              0x86830980UL, 0xed48322bUL, 0x70ac1e11UL, 0x724e6c5aUL,
+    494              0xfffbfd0eUL, 0x38560f85UL, 0xd51e3daeUL, 0x3927362dUL,
+    495              0xd9640a0fUL, 0xa621685cUL, 0x54d19b5bUL, 0x2e3a2436UL,
+    496              0x67b10c0aUL, 0xe70f9357UL, 0x96d2b4eeUL, 0x919e1b9bUL,
+    497              0xc54f80c0UL, 0x20a261dcUL, 0x4b695a77UL, 0x1a161c12UL,
+    498              0xba0ae293UL, 0x2ae5c0a0UL, 0xe0433c22UL, 0x171d121bUL,
+    499              0x0d0b0e09UL, 0xc7adf28bUL, 0xa8b92db6UL, 0xa9c8141eUL,
+    500              0x198557f1UL, 0x074caf75UL, 0xddbbee99UL, 0x60fda37fUL,
+    501              0x269ff701UL, 0xf5bc5c72UL, 0x3bc54466UL, 0x7e345bfbUL,
+    502              0x29768b43UL, 0xc6dccb23UL, 0xfc68b6edUL, 0xf163b8e4UL,
+    503              0xdccad731UL, 0x85104263UL, 0x22401397UL, 0x112084c6UL,
+    504              0x247d854aUL, 0x3df8d2bbUL, 0x3211aef9UL, 0xa16dc729UL,
+    505              0x2f4b1d9eUL, 0x30f3dcb2UL, 0x52ec0d86UL, 0xe3d077c1UL,
+    506              0x166c2bb3UL, 0xb999a970UL, 0x48fa1194UL, 0x642247e9UL,
+    507              0x8cc4a8fcUL, 0x3f1aa0f0UL, 0x2cd8567dUL, 0x90ef2233UL,
+    508              0x4ec78749UL, 0xd1c1d938UL, 0xa2fe8ccaUL, 0x0b3698d4UL,
+    509              0x81cfa6f5UL, 0xde28a57aUL, 0x8e26dab7UL, 0xbfa43fadUL,
+    510              0x9de42c3aUL, 0x920d5078UL, 0xcc9b6a5fUL, 0x4662547eUL,
+    511              0x13c2f68dUL, 0xb8e890d8UL, 0xf75e2e39UL, 0xaff582c3UL,
+    512              0x80be9f5dUL, 0x937c69d0UL, 0x2da96fd5UL, 0x12b3cf25UL,
+    513              0x993bc8acUL, 0x7da71018UL, 0x636ee89cUL, 0xbb7bdb3bUL,
+    514              0x7809cd26UL, 0x18f46e59UL, 0xb701ec9aUL, 0x9aa8834fUL,
+    515              0x6e65e695UL, 0xe67eaaffUL, 0xcf0821bcUL, 0xe8e6ef15UL,
+    516              0x9bd9bae7UL, 0x36ce4a6fUL, 0x09d4ea9fUL, 0x7cd629b0UL,
+    517              0xb2af31a4UL, 0x23312a3fUL, 0x9430c6a5UL, 0x66c035a2UL,
+    518              0xbc37744eUL, 0xcaa6fc82UL, 0xd0b0e090UL, 0xd81533a7UL,
+    519              0x984af104UL, 0xdaf741ecUL, 0x500e7fcdUL, 0xf62f1791UL,
+    520              0xd68d764dUL, 0xb04d43efUL, 0x4d54ccaaUL, 0x04dfe496UL,
+    521              0xb5e39ed1UL, 0x881b4c6aUL, 0x1fb8c12cUL, 0x517f4665UL,
+    522              0xea049d5eUL, 0x355d018cUL, 0x7473fa87UL, 0x412efb0bUL,
+    523              0x1d5ab367UL, 0xd25292dbUL, 0x5633e910UL, 0x47136dd6UL,
+    524              0x618c9ad7UL, 0x0c7a37a1UL, 0x148e59f8UL, 0x3c89eb13UL,
+    525              0x27eecea9UL, 0xc935b761UL, 0xe5ede11cUL, 0xb13c7a47UL,
+    526              0xdf599cd2UL, 0x733f55f2UL, 0xce791814UL, 0x37bf73c7UL,
+    527              0xcdea53f7UL, 0xaa5b5ffdUL, 0x6f14df3dUL, 0xdb867844UL,
+    528              0xf381caafUL, 0xc43eb968UL, 0x342c3824UL, 0x405fc2a3UL,
+    529              0xc372161dUL, 0x250cbce2UL, 0x498b283cUL, 0x9541ff0dUL,
+    530              0x017139a8UL, 0xb3de080cUL, 0xe49cd8b4UL, 0xc1906456UL,
+    531              0x84617bcbUL, 0xb670d532UL, 0x5c74486cUL, 0x5742d0b8UL,
+    532          };
+    533          static const unsigned int Td3[256] = {
+    534              0xf4a75051UL, 0x4165537eUL, 0x17a4c31aUL, 0x275e963aUL,
+    535              0xab6bcb3bUL, 0x9d45f11fUL, 0xfa58abacUL, 0xe303934bUL,
+    536              0x30fa5520UL, 0x766df6adUL, 0xcc769188UL, 0x024c25f5UL,
+    537              0xe5d7fc4fUL, 0x2acbd7c5UL, 0x35448026UL, 0x62a38fb5UL,
+    538              0xb15a49deUL, 0xba1b6725UL, 0xea0e9845UL, 0xfec0e15dUL,
+    539              0x2f7502c3UL, 0x4cf01281UL, 0x4697a38dUL, 0xd3f9c66bUL,
+    540              0x8f5fe703UL, 0x929c9515UL, 0x6d7aebbfUL, 0x5259da95UL,
+    541              0xbe832dd4UL, 0x7421d358UL, 0xe0692949UL, 0xc9c8448eUL,
+    542              0xc2896a75UL, 0x8e7978f4UL, 0x583e6b99UL, 0xb971dd27UL,
+    543              0xe14fb6beUL, 0x88ad17f0UL, 0x20ac66c9UL, 0xce3ab47dUL,
+    544              0xdf4a1863UL, 0x1a3182e5UL, 0x51336097UL, 0x537f4562UL,
+    545              0x6477e0b1UL, 0x6bae84bbUL, 0x81a01cfeUL, 0x082b94f9UL,
+    546              0x48685870UL, 0x45fd198fUL, 0xde6c8794UL, 0x7bf8b752UL,
+    547              0x73d323abUL, 0x4b02e272UL, 0x1f8f57e3UL, 0x55ab2a66UL,
+    548              0xeb2807b2UL, 0xb5c2032fUL, 0xc57b9a86UL, 0x3708a5d3UL,
+    549              0x2887f230UL, 0xbfa5b223UL, 0x036aba02UL, 0x16825cedUL,
+    550              0xcf1c2b8aUL, 0x79b492a7UL, 0x07f2f0f3UL, 0x69e2a14eUL,
+    551              0xdaf4cd65UL, 0x05bed506UL, 0x34621fd1UL, 0xa6fe8ac4UL,
+    552              0x2e539d34UL, 0xf355a0a2UL, 0x8ae13205UL, 0xf6eb75a4UL,
+    553              0x83ec390bUL, 0x60efaa40UL, 0x719f065eUL, 0x6e1051bdUL,
+    554              0x218af93eUL, 0xdd063d96UL, 0x3e05aeddUL, 0xe6bd464dUL,
+    555              0x548db591UL, 0xc45d0571UL, 0x06d46f04UL, 0x5015ff60UL,
+    556              0x98fb2419UL, 0xbde997d6UL, 0x4043cc89UL, 0xd99e7767UL,
+    557              0xe842bdb0UL, 0x898b8807UL, 0x195b38e7UL, 0xc8eedb79UL,
+    558              0x7c0a47a1UL, 0x420fe97cUL, 0x841ec9f8UL, 0x00000000UL,
+    559              0x80868309UL, 0x2bed4832UL, 0x1170ac1eUL, 0x5a724e6cUL,
+    560              0x0efffbfdUL, 0x8538560fUL, 0xaed51e3dUL, 0x2d392736UL,
+    561              0x0fd9640aUL, 0x5ca62168UL, 0x5b54d19bUL, 0x362e3a24UL,
+    562              0x0a67b10cUL, 0x57e70f93UL, 0xee96d2b4UL, 0x9b919e1bUL,
+    563              0xc0c54f80UL, 0xdc20a261UL, 0x774b695aUL, 0x121a161cUL,
+    564              0x93ba0ae2UL, 0xa02ae5c0UL, 0x22e0433cUL, 0x1b171d12UL,
+    565              0x090d0b0eUL, 0x8bc7adf2UL, 0xb6a8b92dUL, 0x1ea9c814UL,
+    566              0xf1198557UL, 0x75074cafUL, 0x99ddbbeeUL, 0x7f60fda3UL,
+    567              0x01269ff7UL, 0x72f5bc5cUL, 0x663bc544UL, 0xfb7e345bUL,
+    568              0x4329768bUL, 0x23c6dccbUL, 0xedfc68b6UL, 0xe4f163b8UL,
+    569              0x31dccad7UL, 0x63851042UL, 0x97224013UL, 0xc6112084UL,
+    570              0x4a247d85UL, 0xbb3df8d2UL, 0xf93211aeUL, 0x29a16dc7UL,
+    571              0x9e2f4b1dUL, 0xb230f3dcUL, 0x8652ec0dUL, 0xc1e3d077UL,
+    572              0xb3166c2bUL, 0x70b999a9UL, 0x9448fa11UL, 0xe9642247UL,
+    573              0xfc8cc4a8UL, 0xf03f1aa0UL, 0x7d2cd856UL, 0x3390ef22UL,
+    574              0x494ec787UL, 0x38d1c1d9UL, 0xcaa2fe8cUL, 0xd40b3698UL,
+    575              0xf581cfa6UL, 0x7ade28a5UL, 0xb78e26daUL, 0xadbfa43fUL,
+    576              0x3a9de42cUL, 0x78920d50UL, 0x5fcc9b6aUL, 0x7e466254UL,
+    577              0x8d13c2f6UL, 0xd8b8e890UL, 0x39f75e2eUL, 0xc3aff582UL,
+    578              0x5d80be9fUL, 0xd0937c69UL, 0xd52da96fUL, 0x2512b3cfUL,
+    579              0xac993bc8UL, 0x187da710UL, 0x9c636ee8UL, 0x3bbb7bdbUL,
+    580              0x267809cdUL, 0x5918f46eUL, 0x9ab701ecUL, 0x4f9aa883UL,
+    581              0x956e65e6UL, 0xffe67eaaUL, 0xbccf0821UL, 0x15e8e6efUL,
+    582              0xe79bd9baUL, 0x6f36ce4aUL, 0x9f09d4eaUL, 0xb07cd629UL,
+    583              0xa4b2af31UL, 0x3f23312aUL, 0xa59430c6UL, 0xa266c035UL,
+    584              0x4ebc3774UL, 0x82caa6fcUL, 0x90d0b0e0UL, 0xa7d81533UL,
+    585              0x04984af1UL, 0xecdaf741UL, 0xcd500e7fUL, 0x91f62f17UL,
+    586              0x4dd68d76UL, 0xefb04d43UL, 0xaa4d54ccUL, 0x9604dfe4UL,
+    587              0xd1b5e39eUL, 0x6a881b4cUL, 0x2c1fb8c1UL, 0x65517f46UL,
+    588              0x5eea049dUL, 0x8c355d01UL, 0x877473faUL, 0x0b412efbUL,
+    589              0x671d5ab3UL, 0xdbd25292UL, 0x105633e9UL, 0xd647136dUL,
+    590              0xd7618c9aUL, 0xa10c7a37UL, 0xf8148e59UL, 0x133c89ebUL,
+    591              0xa927eeceUL, 0x61c935b7UL, 0x1ce5ede1UL, 0x47b13c7aUL,
+    592              0xd2df599cUL, 0xf2733f55UL, 0x14ce7918UL, 0xc737bf73UL,
+    593              0xf7cdea53UL, 0xfdaa5b5fUL, 0x3d6f14dfUL, 0x44db8678UL,
+    594              0xaff381caUL, 0x68c43eb9UL, 0x24342c38UL, 0xa3405fc2UL,
+    595              0x1dc37216UL, 0xe2250cbcUL, 0x3c498b28UL, 0x0d9541ffUL,
+    596              0xa8017139UL, 0x0cb3de08UL, 0xb4e49cd8UL, 0x56c19064UL,
+    597              0xcb84617bUL, 0x32b670d5UL, 0x6c5c7448UL, 0xb85742d0UL,
+    598          };
+    599          static const unsigned int Td4[256] = {
+    600              0x52525252UL, 0x09090909UL, 0x6a6a6a6aUL, 0xd5d5d5d5UL,
+    601              0x30303030UL, 0x36363636UL, 0xa5a5a5a5UL, 0x38383838UL,
+    602              0xbfbfbfbfUL, 0x40404040UL, 0xa3a3a3a3UL, 0x9e9e9e9eUL,
+    603              0x81818181UL, 0xf3f3f3f3UL, 0xd7d7d7d7UL, 0xfbfbfbfbUL,
+    604              0x7c7c7c7cUL, 0xe3e3e3e3UL, 0x39393939UL, 0x82828282UL,
+    605              0x9b9b9b9bUL, 0x2f2f2f2fUL, 0xffffffffUL, 0x87878787UL,
+    606              0x34343434UL, 0x8e8e8e8eUL, 0x43434343UL, 0x44444444UL,
+    607              0xc4c4c4c4UL, 0xdedededeUL, 0xe9e9e9e9UL, 0xcbcbcbcbUL,
+    608              0x54545454UL, 0x7b7b7b7bUL, 0x94949494UL, 0x32323232UL,
+    609              0xa6a6a6a6UL, 0xc2c2c2c2UL, 0x23232323UL, 0x3d3d3d3dUL,
+    610              0xeeeeeeeeUL, 0x4c4c4c4cUL, 0x95959595UL, 0x0b0b0b0bUL,
+    611              0x42424242UL, 0xfafafafaUL, 0xc3c3c3c3UL, 0x4e4e4e4eUL,
+    612              0x08080808UL, 0x2e2e2e2eUL, 0xa1a1a1a1UL, 0x66666666UL,
+    613              0x28282828UL, 0xd9d9d9d9UL, 0x24242424UL, 0xb2b2b2b2UL,
+    614              0x76767676UL, 0x5b5b5b5bUL, 0xa2a2a2a2UL, 0x49494949UL,
+    615              0x6d6d6d6dUL, 0x8b8b8b8bUL, 0xd1d1d1d1UL, 0x25252525UL,
+    616              0x72727272UL, 0xf8f8f8f8UL, 0xf6f6f6f6UL, 0x64646464UL,
+    617              0x86868686UL, 0x68686868UL, 0x98989898UL, 0x16161616UL,
+    618              0xd4d4d4d4UL, 0xa4a4a4a4UL, 0x5c5c5c5cUL, 0xccccccccUL,
+    619              0x5d5d5d5dUL, 0x65656565UL, 0xb6b6b6b6UL, 0x92929292UL,
+    620              0x6c6c6c6cUL, 0x70707070UL, 0x48484848UL, 0x50505050UL,
+    621              0xfdfdfdfdUL, 0xededededUL, 0xb9b9b9b9UL, 0xdadadadaUL,
+    622              0x5e5e5e5eUL, 0x15151515UL, 0x46464646UL, 0x57575757UL,
+    623              0xa7a7a7a7UL, 0x8d8d8d8dUL, 0x9d9d9d9dUL, 0x84848484UL,
+    624              0x90909090UL, 0xd8d8d8d8UL, 0xababababUL, 0x00000000UL,
+    625              0x8c8c8c8cUL, 0xbcbcbcbcUL, 0xd3d3d3d3UL, 0x0a0a0a0aUL,
+    626              0xf7f7f7f7UL, 0xe4e4e4e4UL, 0x58585858UL, 0x05050505UL,
+    627              0xb8b8b8b8UL, 0xb3b3b3b3UL, 0x45454545UL, 0x06060606UL,
+    628              0xd0d0d0d0UL, 0x2c2c2c2cUL, 0x1e1e1e1eUL, 0x8f8f8f8fUL,
+    629              0xcacacacaUL, 0x3f3f3f3fUL, 0x0f0f0f0fUL, 0x02020202UL,
+    630              0xc1c1c1c1UL, 0xafafafafUL, 0xbdbdbdbdUL, 0x03030303UL,
+    631              0x01010101UL, 0x13131313UL, 0x8a8a8a8aUL, 0x6b6b6b6bUL,
+    632              0x3a3a3a3aUL, 0x91919191UL, 0x11111111UL, 0x41414141UL,
+    633              0x4f4f4f4fUL, 0x67676767UL, 0xdcdcdcdcUL, 0xeaeaeaeaUL,
+    634              0x97979797UL, 0xf2f2f2f2UL, 0xcfcfcfcfUL, 0xcecececeUL,
+    635              0xf0f0f0f0UL, 0xb4b4b4b4UL, 0xe6e6e6e6UL, 0x73737373UL,
+    636              0x96969696UL, 0xacacacacUL, 0x74747474UL, 0x22222222UL,
+    637              0xe7e7e7e7UL, 0xadadadadUL, 0x35353535UL, 0x85858585UL,
+    638              0xe2e2e2e2UL, 0xf9f9f9f9UL, 0x37373737UL, 0xe8e8e8e8UL,
+    639              0x1c1c1c1cUL, 0x75757575UL, 0xdfdfdfdfUL, 0x6e6e6e6eUL,
+    640              0x47474747UL, 0xf1f1f1f1UL, 0x1a1a1a1aUL, 0x71717171UL,
+    641              0x1d1d1d1dUL, 0x29292929UL, 0xc5c5c5c5UL, 0x89898989UL,
+    642              0x6f6f6f6fUL, 0xb7b7b7b7UL, 0x62626262UL, 0x0e0e0e0eUL,
+    643              0xaaaaaaaaUL, 0x18181818UL, 0xbebebebeUL, 0x1b1b1b1bUL,
+    644              0xfcfcfcfcUL, 0x56565656UL, 0x3e3e3e3eUL, 0x4b4b4b4bUL,
+    645              0xc6c6c6c6UL, 0xd2d2d2d2UL, 0x79797979UL, 0x20202020UL,
+    646              0x9a9a9a9aUL, 0xdbdbdbdbUL, 0xc0c0c0c0UL, 0xfefefefeUL,
+    647              0x78787878UL, 0xcdcdcdcdUL, 0x5a5a5a5aUL, 0xf4f4f4f4UL,
+    648              0x1f1f1f1fUL, 0xddddddddUL, 0xa8a8a8a8UL, 0x33333333UL,
+    649              0x88888888UL, 0x07070707UL, 0xc7c7c7c7UL, 0x31313131UL,
+    650              0xb1b1b1b1UL, 0x12121212UL, 0x10101010UL, 0x59595959UL,
+    651              0x27272727UL, 0x80808080UL, 0xececececUL, 0x5f5f5f5fUL,
+    652              0x60606060UL, 0x51515151UL, 0x7f7f7f7fUL, 0xa9a9a9a9UL,
+    653              0x19191919UL, 0xb5b5b5b5UL, 0x4a4a4a4aUL, 0x0d0d0d0dUL,
+    654              0x2d2d2d2dUL, 0xe5e5e5e5UL, 0x7a7a7a7aUL, 0x9f9f9f9fUL,
+    655              0x93939393UL, 0xc9c9c9c9UL, 0x9c9c9c9cUL, 0xefefefefUL,
+    656              0xa0a0a0a0UL, 0xe0e0e0e0UL, 0x3b3b3b3bUL, 0x4d4d4d4dUL,
+    657              0xaeaeaeaeUL, 0x2a2a2a2aUL, 0xf5f5f5f5UL, 0xb0b0b0b0UL,
+    658              0xc8c8c8c8UL, 0xebebebebUL, 0xbbbbbbbbUL, 0x3c3c3c3cUL,
+    659              0x83838383UL, 0x53535353UL, 0x99999999UL, 0x61616161UL,
+    660              0x17171717UL, 0x2b2b2b2bUL, 0x04040404UL, 0x7e7e7e7eUL,
+    661              0xbabababaUL, 0x77777777UL, 0xd6d6d6d6UL, 0x26262626UL,
+    662              0xe1e1e1e1UL, 0x69696969UL, 0x14141414UL, 0x63636363UL,
+    663              0x55555555UL, 0x21212121UL, 0x0c0c0c0cUL, 0x7d7d7d7dUL,
+    664          };
+    665          static const unsigned int rcon[] = {
+    666              0x01000000UL, 0x02000000UL, 0x04000000UL, 0x08000000UL,
+    667              0x10000000UL, 0x20000000UL, 0x40000000UL, 0x80000000UL,
+    668              0x1B000000UL, 0x36000000UL,
+    669          };
+    670          
+    671          #define GETU32(pt) (((unsigned int)(pt)[0] << 24) ^ \
+    672          ((unsigned int)(pt)[1] << 16) ^ \
+    673          ((unsigned int)(pt)[2] <<  8) ^ \
+    674          ((unsigned int)(pt)[3]))
+    675          
+    676          #define PUTU32(ct, st) { (ct)[0] = (unsigned char)((st) >> 24); \
+    677          (ct)[1] = (unsigned char)((st) >> 16); \
+    678          (ct)[2] = (unsigned char)((st) >>  8); \
+    679          (ct)[3] = (unsigned char)(st); }
+    680          
+    681          /*
+    682           * Expand the cipher key into the encryption key schedule and return the
+    683           * number of rounds for the given cipher key size.
+    684           */
+    685          int aes_setkey_enc(unsigned int rk[], const unsigned char cipherKey[], int keyBytes)
+    686          {
+    687              int i = 0;
+    688              unsigned int temp;
+    689              
+    690              rk[0] = GETU32(cipherKey     );
+    691              rk[1] = GETU32(cipherKey +  4);
+    692              rk[2] = GETU32(cipherKey +  8);
+    693              rk[3] = GETU32(cipherKey + 12);
+    694              if (keyBytes == 16) { // 128 bits
+    695                  for (;;) {
+    696                      temp  = rk[3];
+    697                      rk[4] = rk[0] ^
+    698                      (Te4[(temp >> 16) & 0xff] & 0xff000000) ^
+    699                      (Te4[(temp >>  8) & 0xff] & 0x00ff0000) ^
+    700                      (Te4[(temp      ) & 0xff] & 0x0000ff00) ^
+    701                      (Te4[(temp >> 24)       ] & 0x000000ff) ^
+    702                      rcon[i];
+    703                      rk[5] = rk[1] ^ rk[4];
+    704                      rk[6] = rk[2] ^ rk[5];
+    705                      rk[7] = rk[3] ^ rk[6];
+    706                      if (++i == 10) {
+    707                          return 10;
+    708                      }
+    709                      rk += 4;
+    710                  }
+    711              }
+    712              rk[4] = GETU32(cipherKey + 16);
+    713              rk[5] = GETU32(cipherKey + 20);
+    714              if (keyBytes == 24) { // 192 bits
+    715                  for (;;) {
+    716                      temp = rk[ 5];
+    717                      rk[ 6] = rk[ 0] ^
+    718                      (Te4[(temp >> 16) & 0xff] & 0xff000000) ^
+    719                      (Te4[(temp >>  8) & 0xff] & 0x00ff0000) ^
+    720                      (Te4[(temp      ) & 0xff] & 0x0000ff00) ^
+    721                      (Te4[(temp >> 24)       ] & 0x000000ff) ^
+    722                      rcon[i];
+    723                      rk[ 7] = rk[ 1] ^ rk[ 6];
+    724                      rk[ 8] = rk[ 2] ^ rk[ 7];
+    725                      rk[ 9] = rk[ 3] ^ rk[ 8];
+    726                      if (++i == 8) {
+    727                          return 12;
+    728                      }
+    729                      rk[10] = rk[ 4] ^ rk[ 9];
+    730                      rk[11] = rk[ 5] ^ rk[10];
+    731                      rk += 6;
+    732                  }
+    733              }
+    734              rk[6] = GETU32(cipherKey + 24);
+    735              rk[7] = GETU32(cipherKey + 28);
+    736              if (keyBytes == 32) { // 256 bits
+    737                  for (;;) {
+    738                      temp = rk[ 7];
+    739                      rk[ 8] = rk[ 0] ^
+    740                      (Te4[(temp >> 16) & 0xff] & 0xff000000) ^
+    741                      (Te4[(temp >>  8) & 0xff] & 0x00ff0000) ^
+    742                      (Te4[(temp      ) & 0xff] & 0x0000ff00) ^
+    743                      (Te4[(temp >> 24)       ] & 0x000000ff) ^
+    744                      rcon[i];
+    745                      rk[ 9] = rk[ 1] ^ rk[ 8];
+    746                      rk[10] = rk[ 2] ^ rk[ 9];
+    747                      rk[11] = rk[ 3] ^ rk[10];
+    748                      if (++i == 7) {
+    749                          return 14;
+    750                      }
+    751                      temp = rk[11];
+    752                      rk[12] = rk[ 4] ^
+    753                      (Te4[(temp >> 24)       ] & 0xff000000) ^
+    754                      (Te4[(temp >> 16) & 0xff] & 0x00ff0000) ^
+    755                      (Te4[(temp >>  8) & 0xff] & 0x0000ff00) ^
+    756                      (Te4[(temp      ) & 0xff] & 0x000000ff);
+    757                      rk[13] = rk[ 5] ^ rk[12];
+    758                      rk[14] = rk[ 6] ^ rk[13];
+    759                      rk[15] = rk[ 7] ^ rk[14];
+    760                      
+    761                      rk += 8;
+    762                  }
+    763              }
+    764              return 0;
+    765          }
+    766          
+    767          /*
+    768           * Expand the cipher key into encryption and decryption key schedule and
+    769           * return the number of rounds for the given cipher key size.
+    770           */
+    771          int AesGenKeySched(unsigned int rk[], unsigned int rrk[], const unsigned char cipherKey[], int keyBytes)
+    772          {
+    773              int Nr, i;
+    774              
+    775              // expand the cipher key
+    776              Nr = aes_setkey_enc(rk, cipherKey, keyBytes);
+    777              // invert the order of the first round keys
+    778              rrk += Nr * 4;
+    779              rrk[0] = rk[0];
+    780              rrk[1] = rk[1];
+    781              rrk[2] = rk[2];
+    782              rrk[3] = rk[3];
+    783              
+    784              /*
+    785               * apply the inverse MixColumn transform to all round keys but the first
+    786               * and the last
+    787               */
+    788              for (i = 1; i < Nr; i++) {
+    789                  rrk -= 4;
+    790                  rk += 4;
+    791                  rrk[0] =
+    792                  Td0[Te4[(rk[0] >> 24)       ] & 0xff] ^
+    793                  Td1[Te4[(rk[0] >> 16) & 0xff] & 0xff] ^
+    794                  Td2[Te4[(rk[0] >>  8) & 0xff] & 0xff] ^
+    795                  Td3[Te4[(rk[0]      ) & 0xff] & 0xff];
+    796                  rrk[1] =
+    797                  Td0[Te4[(rk[1] >> 24)       ] & 0xff] ^
+    798                  Td1[Te4[(rk[1] >> 16) & 0xff] & 0xff] ^
+    799                  Td2[Te4[(rk[1] >>  8) & 0xff] & 0xff] ^
+    800                  Td3[Te4[(rk[1]      ) & 0xff] & 0xff];
+    801                  rrk[2] =
+    802                  Td0[Te4[(rk[2] >> 24)       ] & 0xff] ^
+    803                  Td1[Te4[(rk[2] >> 16) & 0xff] & 0xff] ^
+    804                  Td2[Te4[(rk[2] >>  8) & 0xff] & 0xff] ^
+    805                  Td3[Te4[(rk[2]      ) & 0xff] & 0xff];
+    806                  rrk[3] =
+    807                  Td0[Te4[(rk[3] >> 24)       ] & 0xff] ^
+    808                  Td1[Te4[(rk[3] >> 16) & 0xff] & 0xff] ^
+    809                  Td2[Te4[(rk[3] >>  8) & 0xff] & 0xff] ^
+    810                  Td3[Te4[(rk[3]      ) & 0xff] & 0xff];
+    811              }
+    812              // invert the order of the last round keys
+    813              rrk -= 4;
+    814              rk += 4;
+    815              rrk[0] = rk[0];
+    816              rrk[1] = rk[1];
+    817              rrk[2] = rk[2];
+    818              rrk[3] = rk[3];
+    819              
+    820              return Nr;
+    821          }
+    822          
+    823          /*
+    824           * Encrypt the plain text into cipher
+    825           */
+    826          void AesEncBlk(AesCtx *pCtx, const unsigned char pt[], unsigned char ct[])
+    827          {
+    828              unsigned int s0, s1, s2, s3, t0, t1, t2, t3, *iv;
+    829              const unsigned int *rk;
+    830              int r;
+    831              
+    832              rk = pCtx->Ek;
+    833              iv = pCtx->Iv;
+    834              /*
+    835               * map byte array block to cipher state
+    836               * and add initial round key:
+    837               */
+    838              s0 = GETU32(pt     ) ^ rk[0];
+    839              s1 = GETU32(pt +  4) ^ rk[1];
+    840              s2 = GETU32(pt +  8) ^ rk[2];
+    841              s3 = GETU32(pt + 12) ^ rk[3];
+    842              if (pCtx->Mode) {
+    843                  s0 = s0 ^ iv[0];
+    844                  s1 = s1 ^ iv[1];
+    845                  s2 = s2 ^ iv[2];
+    846                  s3 = s3 ^ iv[3];
+    847              }
+    848              /*
+    849               * Nr - 1 full rounds:
+    850               */
+    851              r = pCtx->Nr >> 1;
+    852              for (;;) {
+    853                  t0 =
+    854                  Te0[(s0 >> 24)       ] ^
+    855                  Te1[(s1 >> 16) & 0xff] ^
+    856                  Te2[(s2 >>  8) & 0xff] ^
+    857                  Te3[(s3      ) & 0xff] ^
+    858                  rk[4];
+    859                  t1 =
+    860                  Te0[(s1 >> 24)       ] ^
+    861                  Te1[(s2 >> 16) & 0xff] ^
+    862                  Te2[(s3 >>  8) & 0xff] ^
+    863                  Te3[(s0      ) & 0xff] ^
+    864                  rk[5];
+    865                  t2 =
+    866                  Te0[(s2 >> 24)       ] ^
+    867                  Te1[(s3 >> 16) & 0xff] ^
+    868                  Te2[(s0 >>  8) & 0xff] ^
+    869                  Te3[(s1      ) & 0xff] ^
+    870                  rk[6];
+    871                  t3 =
+    872                  Te0[(s3 >> 24)       ] ^
+    873                  Te1[(s0 >> 16) & 0xff] ^
+    874                  Te2[(s1 >>  8) & 0xff] ^
+    875                  Te3[(s2      ) & 0xff] ^
+    876                  rk[7];
+    877                  
+    878                  rk += 8;
+    879                  if (--r == 0) {
+    880                      break;
+    881                  }
+    882                  
+    883                  s0 =
+    884                  Te0[(t0 >> 24)       ] ^
+    885                  Te1[(t1 >> 16) & 0xff] ^
+    886                  Te2[(t2 >>  8) & 0xff] ^
+    887                  Te3[(t3      ) & 0xff] ^
+    888                  rk[0];
+    889                  s1 =
+    890                  Te0[(t1 >> 24)       ] ^
+    891                  Te1[(t2 >> 16) & 0xff] ^
+    892                  Te2[(t3 >>  8) & 0xff] ^
+    893                  Te3[(t0      ) & 0xff] ^
+    894                  rk[1];
+    895                  s2 =
+    896                  Te0[(t2 >> 24)       ] ^
+    897                  Te1[(t3 >> 16) & 0xff] ^
+    898                  Te2[(t0 >>  8) & 0xff] ^
+    899                  Te3[(t1      ) & 0xff] ^
+    900                  rk[2];
+    901                  s3 =
+    902                  Te0[(t3 >> 24)       ] ^
+    903                  Te1[(t0 >> 16) & 0xff] ^
+    904                  Te2[(t1 >>  8) & 0xff] ^
+    905                  Te3[(t2      ) & 0xff] ^
+    906                  rk[3];
+    907              }
+    908              /*
+    909               * apply last round and
+    910               * map cipher state to byte array block:
+    911               */
+    912              s0 =
+    913              (Te4[(t0 >> 24)       ] & 0xff000000) ^
+    914              (Te4[(t1 >> 16) & 0xff] & 0x00ff0000) ^
+    915              (Te4[(t2 >>  8) & 0xff] & 0x0000ff00) ^
+    916              (Te4[(t3      ) & 0xff] & 0x000000ff) ^
+    917              rk[0];
+    918              PUTU32(ct     , s0);
+    919              s1 =
+    920              (Te4[(t1 >> 24)       ] & 0xff000000) ^
+    921              (Te4[(t2 >> 16) & 0xff] & 0x00ff0000) ^
+    922              (Te4[(t3 >>  8) & 0xff] & 0x0000ff00) ^
+    923              (Te4[(t0      ) & 0xff] & 0x000000ff) ^
+    924              rk[1];
+    925              PUTU32(ct +  4, s1);
+    926              s2 =
+    927              (Te4[(t2 >> 24)       ] & 0xff000000) ^
+    928              (Te4[(t3 >> 16) & 0xff] & 0x00ff0000) ^
+    929              (Te4[(t0 >>  8) & 0xff] & 0x0000ff00) ^
+    930              (Te4[(t1      ) & 0xff] & 0x000000ff) ^
+    931              rk[2];
+    932              PUTU32(ct +  8, s2);
+    933              s3 =
+    934              (Te4[(t3 >> 24)       ] & 0xff000000) ^
+    935              (Te4[(t0 >> 16) & 0xff] & 0x00ff0000) ^
+    936              (Te4[(t1 >>  8) & 0xff] & 0x0000ff00) ^
+    937              (Te4[(t2      ) & 0xff] & 0x000000ff) ^
+    938              rk[3];
+    939              PUTU32(ct + 12, s3);
+    940              
+    941              if (pCtx->Mode) {
+    942                  iv[0] = s0;
+    943                  iv[1] = s1;
+    944                  iv[2] = s2;
+    945                  iv[3] = s3;
+    946              }
+    947          }
+    948          
+    949          /*
+    950           * Decrypt the cipher into plain text
+    951           */
+    952          void AesDecBlk(AesCtx *pCtx, const unsigned char ct[], unsigned char pt[])
+    953          {
+    954              unsigned int s0, s1, s2, s3, t0, t1, t2, t3, v0, v1, v2, v3, *iv;
+    955              const unsigned int *rk;
+    956              int r;
+    957              
+    958              rk = pCtx->Dk;
+    959              iv = pCtx->Iv;
+    960              /*
+    961               * map byte array block to cipher state
+    962               * and add initial round key:
+    963               */
+    964              v0 = GETU32(ct     );    s0 = v0 ^ rk[0];
+    965              v1 = GETU32(ct +  4);    s1 = v1 ^ rk[1];
+    966              v2 = GETU32(ct +  8);    s2 = v2 ^ rk[2];
+    967              v3 = GETU32(ct + 12);    s3 = v3 ^ rk[3];
+    968              /*
+    969               * Nr - 1 full rounds:
+    970               */
+    971              r = pCtx->Nr >> 1;
+    972              for (;;) {
+    973                  t0 =
+    974                  Td0[(s0 >> 24)       ] ^
+    975                  Td1[(s3 >> 16) & 0xff] ^
+    976                  Td2[(s2 >>  8) & 0xff] ^
+    977                  Td3[(s1      ) & 0xff] ^
+    978                  rk[4];
+    979                  t1 =
+    980                  Td0[(s1 >> 24)       ] ^
+    981                  Td1[(s0 >> 16) & 0xff] ^
+    982                  Td2[(s3 >>  8) & 0xff] ^
+    983                  Td3[(s2      ) & 0xff] ^
+    984                  rk[5];
+    985                  t2 =
+    986                  Td0[(s2 >> 24)       ] ^
+    987                  Td1[(s1 >> 16) & 0xff] ^
+    988                  Td2[(s0 >>  8) & 0xff] ^
+    989                  Td3[(s3      ) & 0xff] ^
+    990                  rk[6];
+    991                  t3 =
+    992                  Td0[(s3 >> 24)       ] ^
+    993                  Td1[(s2 >> 16) & 0xff] ^
+    994                  Td2[(s1 >>  8) & 0xff] ^
+    995                  Td3[(s0      ) & 0xff] ^
+    996                  rk[7];
+    997                  
+    998                  rk += 8;
+    999                  if (--r == 0) {
+   1000                      break;
+   1001                  }
+   1002                  
+   1003                  s0 =
+   1004                  Td0[(t0 >> 24)       ] ^
+   1005                  Td1[(t3 >> 16) & 0xff] ^
+   1006                  Td2[(t2 >>  8) & 0xff] ^
+   1007                  Td3[(t1      ) & 0xff] ^
+   1008                  rk[0];
+   1009                  s1 =
+   1010                  Td0[(t1 >> 24)       ] ^
+   1011                  Td1[(t0 >> 16) & 0xff] ^
+   1012                  Td2[(t3 >>  8) & 0xff] ^
+   1013                  Td3[(t2      ) & 0xff] ^
+   1014                  rk[1];
+   1015                  s2 =
+   1016                  Td0[(t2 >> 24)       ] ^
+   1017                  Td1[(t1 >> 16) & 0xff] ^
+   1018                  Td2[(t0 >>  8) & 0xff] ^
+   1019                  Td3[(t3      ) & 0xff] ^
+   1020                  rk[2];
+   1021                  s3 =
+   1022                  Td0[(t3 >> 24)       ] ^
+   1023                  Td1[(t2 >> 16) & 0xff] ^
+   1024                  Td2[(t1 >>  8) & 0xff] ^
+   1025                  Td3[(t0      ) & 0xff] ^
+   1026                  rk[3];
+   1027              }
+   1028              /*
+   1029               * apply last round and
+   1030               * map cipher state to byte array block:
+   1031               */
+   1032              s0 =
+   1033              (Td4[(t0 >> 24)       ] & 0xff000000) ^
+   1034              (Td4[(t3 >> 16) & 0xff] & 0x00ff0000) ^
+   1035              (Td4[(t2 >>  8) & 0xff] & 0x0000ff00) ^
+   1036              (Td4[(t1      ) & 0xff] & 0x000000ff) ^
+   1037              rk[0];
+   1038              s1 =
+   1039              (Td4[(t1 >> 24)       ] & 0xff000000) ^
+   1040              (Td4[(t0 >> 16) & 0xff] & 0x00ff0000) ^
+   1041              (Td4[(t3 >>  8) & 0xff] & 0x0000ff00) ^
+   1042              (Td4[(t2      ) & 0xff] & 0x000000ff) ^
+   1043              rk[1];
+   1044              s2 =
+   1045              (Td4[(t2 >> 24)       ] & 0xff000000) ^
+   1046              (Td4[(t1 >> 16) & 0xff] & 0x00ff0000) ^
+   1047              (Td4[(t0 >>  8) & 0xff] & 0x0000ff00) ^
+   1048              (Td4[(t3      ) & 0xff] & 0x000000ff) ^
+   1049              rk[2];
+   1050              s3 =
+   1051              (Td4[(t3 >> 24)       ] & 0xff000000) ^
+   1052              (Td4[(t2 >> 16) & 0xff] & 0x00ff0000) ^
+   1053              (Td4[(t1 >>  8) & 0xff] & 0x0000ff00) ^
+   1054              (Td4[(t0      ) & 0xff] & 0x000000ff) ^
+   1055              rk[3];
+   1056              
+   1057              if (pCtx->Mode) {
+   1058                  s0 = s0 ^ iv[0];    iv[0] = v0;
+   1059                  s1 = s1 ^ iv[1];    iv[1] = v1;
+   1060                  s2 = s2 ^ iv[2];    iv[2] = v2;
+   1061                  s3 = s3 ^ iv[3];    iv[3] = v3;
+   1062              }
+   1063              
+   1064              PUTU32(pt     , s0);
+   1065              PUTU32(pt +  4, s1);
+   1066              PUTU32(pt +  8, s2);
+   1067              PUTU32(pt + 12, s3);
+   1068          }
+   1069          
+   1070          //////////////////////////////////////////////////////////////////////////////
+   1071          // API functions                                                            //
+   1072          //////////////////////////////////////////////////////////////////////////////
+   1073          
+   1074          /*
+   1075           * initialize AES context
+   1076           */
+   1077          int AesCtxIni(AesCtx *pCtx, unsigned char *pIV, unsigned char *pKey, unsigned int KeyLen, unsigned char Mode)
+   1078          {
+   1079              if (pKey == 0 || pCtx == 0 || (KeyLen != KEY128 && KeyLen != KEY192 && KeyLen != KEY256))
+   1080                  return -1;
+   1081                 
+   1082              // generate key schedule
+   1083              pCtx->Nr = AesGenKeySched(pCtx->Ek,  pCtx->Dk, pKey, KeyLen);
+   1084                    
+   1085              // initialize IV
+   1086              if (pIV != 0) {
+   1087                  pCtx->Iv[0] = GETU32(pIV     );
+   1088                  pCtx->Iv[1] = GETU32(pIV + 4 );
+   1089                  pCtx->Iv[2] = GETU32(pIV + 8 );
+   1090                  pCtx->Iv[3] = GETU32(pIV + 12);
+   1091              }
+   1092              
+   1093              // mode
+   1094              pCtx->Mode = Mode;   
+   1095              return 0;
+   1096          }
+   1097          
+   1098          /*
+   1099           * Encrypt plain text
+   1100           */
+   1101          int AesEncrypt(AesCtx *pCtx, unsigned char *pData, unsigned char *pCipher, unsigned int DataLen)
+   1102          {
+   1103              int i;
+   1104              
+   1105           //   if (pData == 0 || pCipher == 0 || pCtx == 0 || (DataLen & 0xf) != 0)
+   1106           //       return -1;
+   1107             
+   1108              if(pData == 0)
+   1109              {
+   1110          //      uart_printf("Data is empty");
+   1111                return -2;
+   1112              }
+   1113              else if(pCipher == 0)
+   1114              {
+   1115          //      uart_printf("cipher is empth");
+   1116                return -3;
+   1117              }
+   1118              else if(pCtx == 0)
+   1119              {
+   1120          //      uart_printf("context is empty");
+   1121                return -4;
+   1122              }
+   1123              else if((DataLen & 0xf) != 0)
+   1124              {
+   1125          //      uart_printf("datalen is not a multiple of 16");
+   1126                return -5;
+   1127              }
+   1128              
+   1129              for (i = 0; i < DataLen; i += BLOCKSZ) {
+   1130                  // encrypt block by block
+   1131                  AesEncBlk(pCtx, pData, pCipher);
+   1132                  pCipher += BLOCKSZ;
+   1133                  pData += BLOCKSZ;
+   1134              }
+   1135                 
+   1136              return DataLen;
+   1137          }
+   1138          
+   1139          /*
+   1140           * Decrypt cipher
+   1141           */
+   1142          int AesDecrypt(AesCtx *pCtx, unsigned char *pCipher, unsigned char *pData, unsigned int CipherLen)
+   1143          {
+   1144              int i;
+   1145              
+   1146              if (pData == 0 || pCipher == 0 || pCtx == 0 || (CipherLen & 0xf) != 0)
+   1147                  return -1;
+   1148              
+   1149              for (i = 0; i < CipherLen; i += BLOCKSZ) {
+   1150                  // decrypt block by block
+   1151                  AesDecBlk(pCtx, pCipher, pData);
+   1152                  pCipher += BLOCKSZ;
+   1153                  pData += BLOCKSZ;
+   1154              }
+   1155              return CipherLen;
+   1156          }
+   1157          
+   1158          //////////////////////////////////////////////////////////////////////////////
+   1159          // Sample main program                                                      //
+   1160          //////////////////////////////////////////////////////////////////////////////
+   1161          
+   1162          #ifndef EMBEDDED
+   1163          int main()
+   1164          {
+   1165              AesCtx ctx;
+   1166              unsigned char iv[] = "1234";
+   1167              unsigned char key[] = "876543218765432";
+   1168              unsigned char databuf[] = "Data : AES Test"; // must be in multiple of 16
+   1169              
+   1170              printf("plaintext: %s\n", databuf);
+   1171              // initialize context and encrypt data at one end
+   1172              
+   1173              if( AesCtxIni(&ctx, iv, key, KEY128, CBC) < 0)
+   1174                  printf("init error\n");
+   1175              
+   1176              if (AesEncrypt(&ctx, databuf, databuf, sizeof databuf) < 0)
+   1177                  printf("error in encryption\n");
+   1178              
+   1179              printf("cipher: %s\n", databuf);
+   1180              // initialize context and decrypt cipher at other end
+   1181              
+   1182              if( AesCtxIni(&ctx, iv, key, KEY128, CBC) < 0)
+   1183                  printf("init error\n");
+   1184              
+   1185              if (AesDecrypt(&ctx, databuf, databuf, sizeof databuf) < 0)
+   1186                  printf("error in decryption\n");
+   1187              
+   1188              printf("decrypted msg: %s\n", databuf);
+   1189              
+   1190              return 0;
+   1191          }
+   1192          #endif
+
+   Maximum stack usage in bytes:
+
+   .cstack Function
+   ------- --------
+      16   AesCtxIni
+        16   -> AesGenKeySched
+      60   AesDecBlk
+      24   AesDecrypt
+        24   -> AesDecBlk
+      44   AesEncBlk
+      24   AesEncrypt
+        24   -> AesEncBlk
+      24   AesGenKeySched
+        24   -> aes_setkey_enc
+      16   aes_setkey_enc
+
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+       4  ??DataTable0
+       4  ??DataTable0_1
+       4  ??DataTable1
+       4  ??DataTable1_1
+       4  ??DataTable1_2
+       4  ??DataTable1_3
+       4  ??DataTable1_4
+       4  ??DataTable2
+       4  ??DataTable3
+     168  AesCtxIni
+    1354  AesDecBlk
+      66  AesDecrypt
+    1292  AesEncBlk
+      84  AesEncrypt
+     612  AesGenKeySched
+    1024  Td0
+    1024  Td1
+    1024  Td2
+    1024  Td3
+    1024  Td4
+    1024  Te0
+    1024  Te1
+    1024  Te2
+    1024  Te3
+    1024  Te4
+     712  aes_setkey_enc
+      40  rcon
+
+ 
+ 10 280 bytes in section .rodata
+  4 324 bytes in section .text
+ 
+  4 324 bytes of CODE  memory
+ 10 280 bytes of CONST memory
+
+Errors: none
+Warnings: none

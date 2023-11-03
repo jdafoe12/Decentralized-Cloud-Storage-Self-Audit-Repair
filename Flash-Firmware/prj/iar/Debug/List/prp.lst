@@ -1,0 +1,147 @@
+###############################################################################
+#
+# IAR ANSI C/C++ Compiler V7.40.5.9725/W32 for ARM        28/Oct/2023  18:58:37
+# Copyright 1999-2015 IAR Systems AB.
+#
+#    Cpu mode     =  thumb
+#    Endian       =  little
+#    Source file  =  C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\core\ftl\prp.c
+#    Command line =  
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\core\ftl\prp.c -D
+#        BOOT_LEVEL_2 -lcN
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\Debug\List -o
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\Debug\Obj --no_cse
+#        --no_unroll --no_inline --no_code_motion --no_tbaa --no_clustering
+#        --no_scheduling --debug --endian=little --cpu=ARM926EJ-S -e --fpu=None
+#        --dlib_config "C:\Program Files (x86)\IAR Systems\Embedded Workbench
+#        7.2\arm\INC\c\DLib_Config_Normal.h" -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\ -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\sys\lpc313x\bsp\
+#        -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\sys\lpc313x\csp\
+#        -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\sys\lpc313x\lib\
+#        -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\sys\lpc313x\usb\
+#        --cpu_mode thumb -Ol --use_c++_inline
+#    List file    =  
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\Debug\List\prp.lst
+#    Object file  =  
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\Debug\Obj\prp.o
+#
+###############################################################################
+
+C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\core\ftl\prp.c
+      1          #include <stdlib.h>
+      2          #include <string.h>
+      3          #include <stdint.h>
+      4          #include "math.h"
+      5          
+      6          #include "aes.h"
+      7          
+      8          void generate_round_key(const uint8_t *key, int round_num, uint8_t *round_key)
+      9          {
+     10              // Generate a unique round key based on the key and the round number
+     11              memcpy(round_key, key, 16);
+     12              round_key[15] ^= round_num;
+     13          }
+     14          
+     15          
+     16          
+     17          
+     18          uint64_t round_function(uint64_t data, uint8_t *key)
+     19          {
+     20              AesCtx ctx;
+     21              uint8_t plaintext[16] = {0};
+     22              uint8_t ciphertext[16];
+     23          
+     24              memcpy(plaintext + 8, &data, 8);
+     25          
+     26              if (AesCtxIni(&ctx, NULL, key, KEY128, EBC) < 0)
+     27              {
+     28                  printf("init error\n");
+     29                  exit(1);
+     30              }
+     31          
+     32              if (AesEncrypt(&ctx, plaintext, ciphertext, sizeof(plaintext)) < 0)
+     33              {
+     34                  printf("error in encryption\n");
+     35                  exit(1);
+     36              }
+     37          
+     38              uint64_t result = *((uint64_t *)(ciphertext + 8)) & 0xFFFFFFFFFFFFFFFF;
+     39              return result;
+     40          }
+     41          
+     42          uint64_t feistel_network_prp(const uint8_t *key, uint64_t input_block, int num_bits)
+     43          {
+     44              // Perform a fixed number of rounds (e.g., 4 rounds)
+     45          	if(num_bits == 0) {
+     46          		return 0;
+     47          	}
+     48              int num_rounds = 4;
+     49              int round_num;
+     50              for (round_num = 0; round_num < num_rounds; round_num++)
+     51              {
+     52                  // Compute the round key based on the current round number
+     53                  uint8_t round_key[16];
+     54                  generate_round_key(key, round_num, round_key);
+     55          
+     56                  // Extract the right half of the input
+     57                  uint64_t right_half = input_block & ((1ULL << (num_bits / 2)) - 1);
+     58          
+     59                  // Apply the Feistel round function
+     60                  uint64_t f_result = round_function(right_half, round_key);
+     61          
+     62                  // XOR the result of the round function with the left half
+     63                  input_block ^= (f_result << (num_bits / 2));
+     64              }
+     65          
+     66              // Return the result
+     67              return input_block << (64 - num_bits) >> (64 - num_bits);
+     68          }
+     69          
+
+   Maximum stack usage in bytes:
+
+   .cstack Function
+   ------- --------
+      56   feistel_network_prp
+        56   -> generate_round_key
+        56   -> round_function
+        56 __aeabi_idiv
+        56 __aeabi_llsl
+        56 __aeabi_llsr
+      16   generate_round_key
+        16   -> __aeabi_memcpy
+     560   round_function
+       560   -> AesCtxIni
+       560   -> AesEncrypt
+       560   -> __aeabi_memclr4
+       560   -> __aeabi_memcpy
+       560   -> exit
+       560   -> printf
+
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+       4  ??DataTable0
+       4  ??DataTable0_1
+      16  ?_0
+      12  ?_1
+      24  ?_2
+     152  feistel_network_prp
+      24  generate_round_key
+     102  round_function
+
+ 
+  52 bytes in section .rodata
+ 286 bytes in section .text
+ 
+ 286 bytes of CODE  memory
+  52 bytes of CONST memory
+
+Errors: none
+Warnings: 2

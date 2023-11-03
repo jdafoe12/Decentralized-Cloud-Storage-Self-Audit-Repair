@@ -1,0 +1,152 @@
+###############################################################################
+#
+# IAR ANSI C/C++ Compiler V7.40.5.9725/W32 for ARM        28/Oct/2023  18:58:36
+# Copyright 1999-2015 IAR Systems AB.
+#
+#    Cpu mode     =  thumb
+#    Endian       =  little
+#    Source file  =  C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\core\ftl\init.c
+#    Command line =  
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\core\ftl\init.c -D
+#        BOOT_LEVEL_2 -lcN
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\Debug\List -o
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\Debug\Obj --no_cse
+#        --no_unroll --no_inline --no_code_motion --no_tbaa --no_clustering
+#        --no_scheduling --debug --endian=little --cpu=ARM926EJ-S -e --fpu=None
+#        --dlib_config "C:\Program Files (x86)\IAR Systems\Embedded Workbench
+#        7.2\arm\INC\c\DLib_Config_Normal.h" -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\ -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\sys\lpc313x\bsp\
+#        -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\sys\lpc313x\csp\
+#        -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\sys\lpc313x\lib\
+#        -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\sys\lpc313x\usb\
+#        --cpu_mode thumb -Ol --use_c++_inline
+#    List file    =  
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\Debug\List\init.lst
+#    Object file  =  
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\Debug\Obj\init.o
+#
+###############################################################################
+
+C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\core\ftl\init.c
+      1          // jdafoe
+      2          
+      3          #include "ecdh.h"
+      4          #include "init.h"
+      5          #include <stdint.h> 
+      6          #include <core\inc\cmn.h>
+      7          #include <core\inc\ftl.h>
+      8          #include <core\inc\ubi.h>
+      9          //#include <core\inc\mtd.h>
+     10          #include <sys\sys.h>
+     11          #include "ftl_inc.h"
+     12          #include <core\inc\buf.h>
+     13          
+     14          /* pseudo random number generator with 128 bit internal state... probably not suited for cryptographical usage. Taken from github.com/kokke/tiny-ECDH-c */
+     15          typedef struct
+     16          {
+     17            uint32_t a;
+     18            uint32_t b;
+     19            uint32_t c;
+     20            uint32_t d;
+     21          } prng_t;
+     22          
+     23          static prng_t prng_ctx;
+     24          
+     25          static uint32_t prng_rotate(uint32_t x, uint32_t k)
+     26          {
+     27            return (x << k) | (x >> (32 - k)); 
+     28          }
+     29          
+     30          static uint32_t prng_next(void)
+     31          {
+     32            uint32_t e = prng_ctx.a - prng_rotate(prng_ctx.b, 27); 
+     33            prng_ctx.a = prng_ctx.b ^ prng_rotate(prng_ctx.c, 17); 
+     34            prng_ctx.b = prng_ctx.c + prng_ctx.d;
+     35            prng_ctx.c = prng_ctx.d + e; 
+     36            prng_ctx.d = e + prng_ctx.a;
+     37            return prng_ctx.d;
+     38          }
+     39          
+     40          static void prng_init(uint32_t seed)
+     41          {
+     42            uint32_t i;
+     43            prng_ctx.a = 0xf1ea5eed;
+     44            prng_ctx.b = prng_ctx.c = prng_ctx.d = seed;
+     45          
+     46            for (i = 0; i < 31; ++i) 
+     47            {
+     48              (void) prng_next();
+     49            }
+     50          }
+     51          /*End pseudo RNG */ 
+     52          
+     53          
+     54          int gen_ecc_keypair(uint8_t *dh_pubKey, uint8_t *dh_privKey) {
+     55            
+     56            // Generate random private key;
+     57            static int initialized = 0;
+     58            if(!initialized) {
+     59              prng_init((0xbad ^ 0xc0ffee ^ 42) | 0xcafebabe | 777);
+     60              initialized = 1;
+     61            }
+     62            for(int i = 0; i < ECC_PRV_KEY_SIZE; ++i) {
+     63              dh_privKey[i] = prng_next();
+     64            }
+     65            
+     66            // Generate public key
+     67            return ecdh_generate_keys(dh_pubKey, dh_privKey);
+     68          }
+     69          
+     70          int gen_shared_dh_key(uint8_t *dh_privKey, uint8_t *sgx_pubKey, uint8_t *dh_sharedKey) {
+     71            return ecdh_shared_secret(dh_privKey, sgx_pubKey, dh_sharedKey);
+     72          }
+     73          
+     74          // end jdafoe
+     75          
+
+   Maximum stack usage in bytes:
+
+   .cstack Function
+   ------- --------
+      16   gen_ecc_keypair
+        16   -> ecdh_generate_keys
+        16   -> prng_init
+        16   -> prng_next
+       8   gen_shared_dh_key
+         8   -> ecdh_shared_secret
+       8   prng_init
+         8   -> prng_next
+      16   prng_next
+        16   -> prng_rotate
+       0   prng_rotate
+
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+       4  ??DataTable2
+       4  ??DataTable2_1
+       4  ??DataTable2_2
+       4  ??DataTable2_3
+      52  gen_ecc_keypair
+       8  gen_shared_dh_key
+       4  initialized
+      16  prng_ctx
+      36  prng_init
+      78  prng_next
+       6  prng_rotate
+
+ 
+  20 bytes in section .bss
+ 196 bytes in section .text
+ 
+ 196 bytes of CODE memory
+  20 bytes of DATA memory
+
+Errors: none
+Warnings: none

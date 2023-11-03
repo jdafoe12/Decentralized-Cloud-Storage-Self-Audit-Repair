@@ -1,0 +1,716 @@
+###############################################################################
+#
+# IAR ANSI C/C++ Compiler V7.40.5.9725/W32 for ARM        28/Oct/2023  18:58:36
+# Copyright 1999-2015 IAR Systems AB.
+#
+#    Cpu mode     =  thumb
+#    Endian       =  little
+#    Source file  =  
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\core\ftl\ftl_api.c
+#    Command line =  
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\core\ftl\ftl_api.c -D
+#        BOOT_LEVEL_2 -lcN
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\Debug\List -o
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\Debug\Obj --no_cse
+#        --no_unroll --no_inline --no_code_motion --no_tbaa --no_clustering
+#        --no_scheduling --debug --endian=little --cpu=ARM926EJ-S -e --fpu=None
+#        --dlib_config "C:\Program Files (x86)\IAR Systems\Embedded Workbench
+#        7.2\arm\INC\c\DLib_Config_Normal.h" -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\ -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\sys\lpc313x\bsp\
+#        -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\sys\lpc313x\csp\
+#        -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\sys\lpc313x\lib\
+#        -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\sys\lpc313x\usb\
+#        --cpu_mode thumb -Ol --use_c++_inline
+#    List file    =  
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\Debug\List\ftl_api.lst
+#    Object file  =  
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\Debug\Obj\ftl_api.o
+#
+###############################################################################
+
+C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\core\ftl\ftl_api.c
+      1          /*********************************************************
+      2           * Module name: ftl_api.c
+      3           *
+      4           * Copyright 2010, 2011. All Rights Reserved, Crane Chu.
+      5           *
+      6           * This file is part of OpenNFM.
+      7           *
+      8           * OpenNFM is free software: you can redistribute it and/or 
+      9           * modify it under the terms of the GNU General Public 
+     10           * License as published by the Free Software Foundation, 
+     11           * either version 3 of the License, or (at your option) any 
+     12           * later version.
+     13           * 
+     14           * OpenNFM is distributed in the hope that it will be useful,
+     15           * but WITHOUT ANY WARRANTY; without even the implied 
+     16           * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR 
+     17           * PURPOSE. See the GNU General Public License for more 
+     18           * details.
+     19           *
+     20           * You should have received a copy of the GNU General Public 
+     21           * License along with OpenNFM. If not, see 
+     22           * <http://www.gnu.org/licenses/>.
+     23           *
+     24           * First written on 2010-01-01 by cranechu@gmail.com
+     25           *
+     26           * Module Description:
+     27           *    FTL APIs.
+     28           *
+     29           *********************************************************/
+     30          
+     31          #include <core\inc\cmn.h>
+     32          #include <core\inc\ftl.h>
+     33          #include <core\inc\ubi.h>
+     34          //#include <core\inc\mtd.h>
+     35          #include <sys\sys.h>
+     36          #include "ftl_inc.h"
+     37          #include <core\inc\buf.h>
+     38          
+     39          // jdafoe
+     40          #include "init.h"
+     41          #include "ecdh.h"
+     42          #include "aes.h"
+     43          #include "hmac.h"
+     44          #include "prp.h"
+     45          #define KEY_SIZE 16
+     46          // end jdafoe
+     47             
+     48          /* Advanced Page Mapping FTL:
+     49           * - Block Dirty Table: LOG_BLOCK 0, cache all
+     50           * - ROOT Table: LOG_BLOCK 1, cache all. point to journal blocks.
+     51           * - Page Mapping Table: LOG_BLOCK 2~N, cache x pages with LRU algo.
+     52           * - DATA Journal: commit
+     53           * - Init: read BDT, ROOT, PMT, Journal info, ...
+     54           * - Reclaim
+     55           * - Meta Data Page: in last page in PMT blocks and data blocks.
+     56           * - choose journal block on erase and write, according to die index
+     57           *
+     58           * TODO: advanced features:
+     59           * - sanitizing
+     60           * - bg erase
+     61           * - check wp/trim, ...
+     62           */
+     63          
+     64          // Jdafoe
+     65          extern int read_state = 0; // keeps track of the read state. Determines what to do on reads
+     66                                      // 0: Regular mode
+     67                                      // 1: Audit mode
+     68                                      // 2: Parity generation
+     69          static uint8_t dh_sharedKey[ECC_PUB_KEY_SIZE];
+     70          static uint8_t tempKey[KEY_SIZE];
+     71          extern int page_inx = 0; // Used to find offset of data in page read.
+     72          static int numBits = 0;  // Number of bits IO for the inverse PRP.
+     73          static int genPar = 0;   // Boolean value. Keeps track of whether FTL is in parity generation mode.
+     74                                    // 0: Regular mode
+     75                                    // 1: Parity generation mode.
+     76          //int read_loops;
+     77          // end Jdafoe
+     78          
+     79          // Jdafoe
+     80          
+     81          // Niusen
+     82          // Function to encrypt read data
+     83          #define NUM1     (1<<24)
+     84          #define NUM2     (1<<16)
+     85          #define NUM3     (1<<8)
+     86          int EncryptData(uint32_t* KEY,void* buffer, int dataLen)
+     87          {
+     88              //encrypt before writing
+     89              AesCtx ctx;
+     90              unsigned char iv[] = "1234";
+     91              //unsigned char key[] = "876543218765432";
+     92              unsigned char key[16];    
+     93              uint8_t i;
+     94              for(i=0;i<4;i++){    
+     95               key[4*i]=(*(KEY+i))/NUM1;
+     96               key[(4*i)+1]=((*(KEY+i))/NUM2)%NUM3;
+     97               key[(4*i)+2]=(*(KEY+i)% NUM2)/NUM3;
+     98               key[(4*i)+3]=(*(KEY+i)% NUM2)%NUM3;
+     99              }
+    100              for(i=0;i<16;i++){ 
+    101               // uart_printf("EncryptData():the %d byte of key is %x\n\r",i,key[i]); 
+    102              }
+    103              
+    104              //uart_printf("before encrypt: %s\n\r", buffer);
+    105              
+    106             // initialize context and encrypt data at one end    
+    107              if( AesCtxIni(&ctx, iv, key, KEY128, EBC) < 0)
+    108                  uart_printf("init error\n");
+    109              
+    110              int flag = 0;
+    111              if ((flag = AesEncrypt(&ctx, (unsigned char *)buffer, (unsigned char *)buffer, dataLen)) < 0) 
+    112                // dataLen needs to be different based on PDP vs ECC. Full 512 byte segment for ECC. KEY_SIZE for PDP.
+    113              {
+    114                 uart_printf("error in encryption\n");
+    115                 if(flag == -2)
+    116                {
+    117                  uart_printf("Data is empty");
+    118                  //return -2;
+    119                }
+    120                else if(flag == -3)
+    121                {
+    122                  uart_printf("cipher is empty");
+    123                //return -3;
+    124                }
+    125                else if(flag == -4)
+    126                {
+    127                  uart_printf("context is empty");
+    128                 // return -4;
+    129                }
+    130                else if(flag == -5)
+    131                {
+    132                  uart_printf("data length is not a multiple of 16");
+    133                //return -5;
+    134                }
+    135                else
+    136                {
+    137                  uart_printf("other error");
+    138                }    
+    139              }else{
+    140                //uart_printf("encryption ok %d\n\r",count_write);
+    141                //uart_printf("after encrypt: %s\n\r", buffer);      
+    142              }
+    143            return 0;
+    144          }
+    145          // end Niusen
+    146          // end Jdafoe
+    147          
+    148          
+    149          
+    150          STATUS FTL_Format() {
+    151            STATUS ret;
+    152              
+    153            ret = UBI_Format();
+    154            if (ret == STATUS_SUCCESS) {
+    155              ret = UBI_Init();
+    156            }
+    157          
+    158            if (ret == STATUS_SUCCESS) {
+    159              ret = DATA_Format();
+    160            }
+    161          
+    162            if (ret == STATUS_SUCCESS) {
+    163              ret = HDI_Format();
+    164            }
+    165          
+    166            if (ret == STATUS_SUCCESS) {
+    167              ret = PMT_Format();
+    168            }
+    169          
+    170            if (ret == STATUS_SUCCESS) {
+    171              ret = BDT_Format();
+    172            }
+    173          
+    174            if (ret == STATUS_SUCCESS) {
+    175              ret = ROOT_Format();
+    176            }
+    177          
+    178            return ret;
+    179          }
+    180          
+    181          STATUS FTL_Init() {
+    182            STATUS ret;
+    183          
+    184            ret = UBI_Init();
+    185            if (ret == STATUS_SUCCESS) {
+    186              /* scan tables on UBI, and copy to RAM */
+    187              ret = ROOT_Init();
+    188            }
+    189          
+    190            if (ret == STATUS_SUCCESS) {
+    191              ret = BDT_Init();
+    192            }
+    193          
+    194            if (ret == STATUS_SUCCESS) {
+    195              ret = PMT_Init();
+    196            }
+    197          
+    198            if (ret == STATUS_SUCCESS) {
+    199              ret = HDI_Init();
+    200            }
+    201          
+    202            if (ret == STATUS_SUCCESS) {
+    203              ret = DATA_Replay(root_table.hot_journal);
+    204            }
+    205          
+    206            if (ret == STATUS_SUCCESS) {
+    207              ret = DATA_Replay(root_table.cold_journal);
+    208            }
+    209          
+    210            if (ret == STATUS_SUCCESS) {
+    211              /* handle reclaim PLR: start reclaim again. Some data should
+    212               * be written in the same place, so just rewrite same data in the
+    213               * same page regardless this page is written or not. */
+    214          
+    215              /* check if hot journal blocks are full */
+    216              if (DATA_IsFull(TRUE) == TRUE) {
+    217                ret = DATA_Reclaim(TRUE);
+    218                if (ret == STATUS_SUCCESS) {
+    219                  ret = DATA_Commit();
+    220                }
+    221              }
+    222          
+    223              /* check if cold journal blocks are full */
+    224              if (DATA_IsFull(FALSE) == TRUE) {
+    225                ret = DATA_Reclaim(FALSE);
+    226                if (ret == STATUS_SUCCESS) {
+    227                  ret = DATA_Commit();
+    228                }
+    229              }
+    230            }
+    231          
+    232            return ret;
+    233          }
+    234          
+    235          STATUS FTL_Write(PGADDR addr, void* buffer) {
+    236            STATUS ret;
+    237            
+    238            
+    239            // Jdafoe
+    240            
+    241            /*
+    242             * 237846 (951384) - 
+    243             * 237847 (951388) - Generate shared key via Diffie-Hellman key exchange.
+    244             * 237848 (951392) - Generate temporary key from shared key, derived from nonce.
+    245             * 237849 (951396) - Recieve page next page number to be read for current audit.
+    246             * 237850 (951400) - Set genPar to 1 or 0. Set numBits to correct number.
+    247             */
+    248            
+    249          
+    250            // Generate ecc keypair for diffie hellman
+    251            if(addr == 237847) { // 951388
+    252              
+    253              uint8_t sgx_pubKey[ECC_PUB_KEY_SIZE];
+    254              uint8_t dh_privKey[ECC_PRV_KEY_SIZE];
+    255              uint8_t dh_pubKey[ECC_PUB_KEY_SIZE];
+    256              int status = 0;
+    257              
+    258              uint8_t *temp = buffer;
+    259              
+    260              //uart_printf("SGX_PUBKEY: ");
+    261              for(int i = 0; i < ECC_PUB_KEY_SIZE; i++) {
+    262                sgx_pubKey[i] = temp[i];
+    263                //uart_printf("%x", sgx_pubKey[i]);
+    264             }
+    265             //uart_printf("\n\n");
+    266              
+    267              status = gen_ecc_keypair(dh_pubKey, dh_privKey); /* Keypair used in DH keygen. pubKey send to SGX */
+    268          
+    269              //uart_printf("FTL PRIVATE KEY: ");
+    270              //for(int i = 0; i < ECC_PRV_KEY_SIZE; i++) {
+    271                //uart_printf("%x", dh_privKey[i]);
+    272              //}
+    273              //uart_printf("\n\n");
+    274                          
+    275              //uart_printf("FTL PUBLIC KEY: ");
+    276              for(int i = 0; i < ECC_PUB_KEY_SIZE; i++) {
+    277                //uart_printf("%x", dh_pubKey[i]);
+    278                temp[i] = dh_pubKey[i]; /* Send pubKey to SGX by writing to this location */
+    279              }
+    280              //uart_printf("\n\n");
+    281              
+    282              status = gen_shared_dh_key(dh_privKey, sgx_pubKey, dh_sharedKey); /* Generate Diffie-Hellman shared key */
+    283          
+    284              uart_printf("FTL SHARED KEY: ");
+    285              for(int i = 0; i < ECC_PUB_KEY_SIZE; i++) {
+    286                uart_printf("%x", dh_sharedKey[i]);
+    287              }
+    288              uart_printf("\n\n");
+    289              
+    290             uart_printf("-------------------------------------------------------\n");
+    291              
+    292            }
+    293            
+    294          
+    295            if(addr == 237848) { //951392
+    296              // Generate tempKey - derived from nonce.
+    297              uint8_t *temp = buffer;
+    298              int len = KEY_SIZE;
+    299              hmac_sha1(dh_sharedKey, ECC_PUB_KEY_SIZE, temp, KEY_SIZE, tempKey, &len);
+    300              //uart_printf("Challenge number recieved: ");
+    301              //for(int i = 0; i < KEY_SIZE; i++) {
+    302                //uart_printf("%x", temp[i]);
+    303              //}
+    304              //uart_printf("\n");
+    305              //uart_printf("Challenge key generated: ");
+    306              //for(int i = 0; i < KEY_SIZE; i++) {
+    307              //}
+    308              //uart_printf("\n");
+    309              //uart_printf("-------------------------------------------------------\n");
+    310            }
+    311            
+    312            // Writes to 237849 (951396) will be te index for next page to be read during audit
+    313            if(addr == 237849) {
+    314              uint8_t *temp = buffer;
+    315              //uart_printf("Recieving index: ");
+    316              //for(int i = 0; i < 1; i++) {
+    317              //  uart_printf("%x", temp[i]);
+    318              //}
+    319              
+    320              if(genPar == 1) {
+    321                read_state = 2;
+    322          
+    323                
+    324              }
+    325              else {
+    326                read_state = 1;
+    327              }
+    328              page_inx = temp[0] % 4;
+    329              //uart_printf("-------------------------------------------------------\n");
+    330            }
+    331            
+    332            // read_state 2 is parity generation mode. Assume read state is set to 0 between operations. When swapping to mode 2, buffer will contain ceil(log_2(numPages))
+    333            if(addr == 237850) { // 951400
+    334              if(genPar != 1) {
+    335                genPar =  1;
+    336                uint8_t *temp = buffer;
+    337                numBits = temp[0];
+    338                uart_printf("genPar = 1\n");
+    339              } 
+    340              else {
+    341                genPar = 0;
+    342              }
+    343            }
+    344            
+    345            // end Jdafoe
+    346            
+    347            BOOL is_hot = HDI_IsHotPage(addr);
+    348            
+    349            ret = DATA_Write(addr, buffer, is_hot);
+    350            if (ret == STATUS_SUCCESS) {
+    351              if (DATA_IsFull(is_hot) == TRUE) {
+    352                ret = DATA_Reclaim(is_hot);
+    353                if (ret == STATUS_SUCCESS) {
+    354                  ret = DATA_Commit();
+    355                }
+    356              }
+    357            }
+    358            return ret;
+    359          }
+    360          
+    361          
+    362          
+    363          
+    364          
+    365          STATUS FTL_Read(PGADDR addr, void* buffer) {
+    366            
+    367            uint8_t ckwi[KEY_SIZE];
+    368            
+    369            // Use inverse_feistel_netwrk_prp on the address, with the tempKey. Read and encrypt the data at this location.
+    370            if(read_state == 2 && addr < 237846) {
+    371              
+    372              //FTL_Read(237849, buffer); // the first int (4 bytes) of this will be the page number with correct data.
+    373              //uint8_t *temp = buffer;
+    374              //uint8_t page = temp[0]; // How does this translate to what address to read?
+    375                    uart_printf("%d\n", addr);
+    376                addr = feistel_network_prp(tempKey, addr, numBits);
+    377                uart_printf("%d\n", addr);
+    378            }
+    379            
+    380            
+    381            if(read_state == 1 && addr < 237846) {
+    382              // Generate challenge key with index
+    383              FTL_Read(237849, buffer); // the first int (4 bytes) of this will be the index.
+    384              int len = KEY_SIZE;
+    385              uint8_t *temp = buffer;
+    386              hmac_sha1(tempKey, KEY_SIZE, temp, sizeof(uint8_t), ckwi, &len); // !THIS ONLY SUPPORTS UP TO 256 PAGES CURRENTLY!
+    387              //uart_printf("Page CKWI key generated: ");
+    388              //for(int i = 0; i < KEY_SIZE; i++) {
+    389              //  uart_printf("%x", ckwi[i]);
+    390             // }
+    391             // uart_printf("\n");
+    392          
+    393            }
+    394            
+    395            LOG_BLOCK block;
+    396            PAGE_OFF page;
+    397            STATUS ret;
+    398          
+    399            ret = PMT_Search(addr, &block, &page);
+    400            //uart_printf("Addr %d ; Block %d ; Page %d \n", addr, block, page);
+    401            if (ret == STATUS_SUCCESS) {
+    402              ret = UBI_Read(block, page, buffer, NULL);
+    403            }
+    404            // Jdafoe
+    405            
+    406            // Encrypt the data.
+    407            if(read_state == 2 && addr < 237846) {
+    408              uint8_t *temp = buffer;
+    409              EncryptData((UINT32 *)tempKey, temp + (512 * page_inx), 512);
+    410              read_state = 0;
+    411              uart_printf("The Encrypted data are:\n");
+    412              for(int i = 0; i < 512; i++) {
+    413                uart_printf("%x", temp[i + (512 * page_inx)]);
+    414              }
+    415              uart_printf("\n");
+    416              
+    417              uart_printf("Got page, and encrypted!\n");
+    418            }
+    419          
+    420            if(read_state == 1 && addr < 237846/*&& buf_ptr[0] == 'M' && buf_ptr[1] == 'A' && buf_ptr[2] == 'G' && buf_ptr[3] == '2' && buf_ptr[4] == '3'*/ ) {
+    421              // Generate key with HMAC-sha1 from github Akagi201/hmac-sha1, using challenge key, and file page number
+    422              // Next, encrypt first 128 bits using AES (provided by Niusen) 
+    423                // Note this should be random 16 bytes, determined by challenge key maybe? or a new key?
+    424            //  uart_printf("Get Page. Encrypting first 16 bytes\n"); 
+    425                
+    426              uint8_t *temp = buffer;
+    427              
+    428              
+    429              EncryptData((UINT32 *)ckwi, temp + (512 * page_inx), KEY_SIZE);
+    430              
+    431              //uart_printf("The Encrypted data are:\n");
+    432              //for(int i = 0; i < 512; i++) {
+    433              //  uart_printf("%x", temp[i + (512 * page_inx)]);
+    434             // }
+    435             // uart_printf("\n");
+    436              
+    437             // uart_printf("Got page, and encrypted!\n");
+    438             // uart_printf("%d\n", page_inx);
+    439              read_state = 0;
+    440             // uart_printf("-------------------------------------------------------\n");
+    441            }
+    442            // end Jdafoe
+    443            
+    444            return ret;
+    445          }
+    446          
+    447          STATUS FTL_Trim(PGADDR start, PGADDR end) {
+    448            PGADDR addr;
+    449            STATUS ret = STATUS_SUCCESS;
+    450          
+    451            for (addr = start; addr <= end; addr++) {
+    452              ret = FTL_Write(addr, NULL);
+    453              if (ret != STATUS_SUCCESS) {
+    454                break;
+    455              }
+    456            }
+    457          
+    458            return ret;
+    459          }
+    460          
+    461          STATUS FTL_SetWP(PGADDR laddr, BOOL enabled) {
+    462            return STATUS_FAILURE;
+    463          }
+    464          
+    465          BOOL FTL_CheckWP(PGADDR laddr) {
+    466            return FALSE;
+    467          }
+    468          
+    469          STATUS FTL_BgTasks() {
+    470            return STATUS_SUCCESS;
+    471          }
+    472          
+    473          PGADDR FTL_Capacity() {
+    474            LOG_BLOCK block;
+    475          
+    476            block = UBI_Capacity;//3989
+    477            block -= JOURNAL_BLOCK_COUNT; /* data hot journal *///1
+    478            block -= JOURNAL_BLOCK_COUNT; /* data cold journal *///1
+    479            block -= JOURNAL_BLOCK_COUNT; /* data reclaim journal *///1
+    480            block -= PMT_BLOCK_COUNT; /* pmt blocks *///40
+    481            block -= 2; /* bdt blocks */
+    482            block -= 2; /* root blocks */
+    483            block -= 2; /* hdi reserved */
+    484            block -= block / 100 * OVER_PROVISION_RATE; /* over provision */
+    485            
+    486            uart_printf("%s: UBI_Capacity=%d\r\n",__func__,UBI_Capacity);
+    487            uart_printf("%s: actual user capacity: block=%d\r\n",__func__,block);//3823
+    488          
+    489            /* last page in every block is reserved for meta data collection */
+    490            return block * (PAGE_PER_PHY_BLOCK - 1);//471
+    491          }
+    492          
+    493          STATUS FTL_Flush() {
+    494            STATUS ret;
+    495          
+    496            ret = DATA_Commit();
+    497            if (ret == STATUS_SUCCESS) {
+    498              ret = UBI_Flush();
+    499            }
+    500          
+    501            if (ret == STATUS_SUCCESS) {
+    502              ret = UBI_SWL();
+    503            }
+    504          
+    505            return ret;
+    506          }
+    507          
+    508          
+    509          
+    510          
+
+   Maximum stack usage in bytes:
+
+   .cstack Function
+   ------- --------
+     552   EncryptData
+       552   -> AesCtxIni
+       552   -> AesEncrypt
+       552   -> __aeabi_memcpy
+       552   -> uart_printf
+       552 __aeabi_uidivmod
+       0   FTL_BgTasks
+       8   FTL_Capacity
+         8   -> uart_printf
+         8 __aeabi_uidiv
+       0   FTL_CheckWP
+       8   FTL_Flush
+         8   -> DATA_Commit
+         8   -> UBI_Flush
+         8   -> UBI_SWL
+       8   FTL_Format
+         8   -> BDT_Format
+         8   -> DATA_Format
+         8   -> HDI_Format
+         8   -> PMT_Format
+         8   -> ROOT_Format
+         8   -> UBI_Format
+         8   -> UBI_Init
+       8   FTL_Init
+         8   -> BDT_Init
+         8   -> DATA_Commit
+         8   -> DATA_IsFull
+         8   -> DATA_Reclaim
+         8   -> DATA_Replay
+         8   -> HDI_Init
+         8   -> PMT_Init
+         8   -> ROOT_Init
+         8   -> UBI_Init
+      56   FTL_Read
+        56   -> EncryptData
+        56   -> FTL_Read
+        56   -> PMT_Search
+        56   -> UBI_Read
+        56   -> feistel_network_prp
+        56   -> hmac_sha1
+        56   -> uart_printf
+       0   FTL_SetWP
+      16   FTL_Trim
+        16   -> FTL_Write
+     192   FTL_Write
+       192   -> DATA_Commit
+       192   -> DATA_IsFull
+       192   -> DATA_Reclaim
+       192   -> DATA_Write
+       192   -> HDI_IsHotPage
+       192   -> gen_ecc_keypair
+       192   -> gen_shared_dh_key
+       192   -> hmac_sha1
+       192   -> uart_printf
+       192 __aeabi_idivmod
+      40   printint
+        40   -> UartWrite
+        40 __aeabi_uidiv
+        40 __aeabi_uidivmod
+      56   printuint
+        56   -> UartWrite
+        56 __aeabi_uidiv
+        56 __aeabi_uidivmod
+      40   uart_printf
+        40   -> UartWrite
+        40   -> printint
+        40   -> printuint
+
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+       4  ??DataTable3
+       4  ??DataTable3_1
+       4  ??DataTable4
+       4  ??DataTable4_1
+       4  ??DataTable4_2
+       4  ??DataTable5
+       4  ??DataTable5_1
+       4  ??DataTable5_2
+       4  ??DataTable5_3
+       4  ??DataTable5_4
+       4  ??DataTable5_5
+       4  ??DataTable5_6
+       4  ??DataTable6
+       4  ??DataTable6_1
+       4  ??DataTable6_2
+       4  ??DataTable6_3
+       4  ??DataTable6_4
+       4  ??DataTable7
+       4  ??DataTable7_1
+       4  ??DataTable7_10
+       4  ??DataTable7_11
+       4  ??DataTable7_12
+       4  ??DataTable7_13
+       4  ??DataTable7_14
+       4  ??DataTable7_15
+       4  ??DataTable7_16
+       4  ??DataTable7_17
+       4  ??DataTable7_18
+       4  ??DataTable7_19
+       4  ??DataTable7_2
+       4  ??DataTable7_3
+       4  ??DataTable7_4
+       4  ??DataTable7_5
+       4  ??DataTable7_6
+       4  ??DataTable7_7
+       4  ??DataTable7_8
+       4  ??DataTable7_9
+       8  ?_0
+       8  ?_1
+       4  ?_10
+       4  ?_11
+      60  ?_12
+      12  ?_13
+       4  ?_14
+      28  ?_15
+       2  ?_16
+      28  ?_17
+      24  ?_18
+      40  ?_19
+      12  ?_2
+      24  ?_3
+      16  ?_4
+      16  ?_5
+      20  ?_6
+      36  ?_7
+      12  ?_8
+      20  ?_9
+     314  EncryptData
+       4  FTL_BgTasks
+      64  FTL_Capacity
+       4  FTL_CheckWP
+      36  FTL_Flush
+      84  FTL_Format
+     176  FTL_Init
+     286  FTL_Read
+       4  FTL_SetWP
+      38  FTL_Trim
+     288  FTL_Write
+      64  dh_sharedKey
+      20  digits
+      20  digits
+       4  genPar
+       4  numBits
+       4  page_inx
+     104  printint
+      64  printuint
+       4  read_state
+      16  tempKey
+     210  uart_printf
+      16  -- Other
+
+ 
+    96 bytes in section .bss
+    40 bytes in section .data
+   394 bytes in section .rodata
+ 1 824 bytes in section .text
+ 
+ 1 824 bytes of CODE  memory
+   394 bytes of CONST memory
+   136 bytes of DATA  memory
+
+Errors: none
+Warnings: 5

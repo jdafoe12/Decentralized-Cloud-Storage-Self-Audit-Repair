@@ -1,0 +1,166 @@
+###############################################################################
+#
+# IAR ANSI C/C++ Compiler V7.40.5.9725/W32 for ARM        28/Oct/2023  18:58:36
+# Copyright 1999-2015 IAR Systems AB.
+#
+#    Cpu mode     =  thumb
+#    Endian       =  little
+#    Source file  =  
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\core\ftl\hmac_sha1.c
+#    Command line =  
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\core\ftl\hmac_sha1.c -D
+#        BOOT_LEVEL_2 -lcN
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\Debug\List -o
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\Debug\Obj --no_cse
+#        --no_unroll --no_inline --no_code_motion --no_tbaa --no_clustering
+#        --no_scheduling --debug --endian=little --cpu=ARM926EJ-S -e --fpu=None
+#        --dlib_config "C:\Program Files (x86)\IAR Systems\Embedded Workbench
+#        7.2\arm\INC\c\DLib_Config_Normal.h" -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\ -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\sys\lpc313x\bsp\
+#        -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\sys\lpc313x\csp\
+#        -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\sys\lpc313x\lib\
+#        -I
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\..\..\sys\lpc313x\usb\
+#        --cpu_mode thumb -Ol --use_c++_inline
+#    List file    =  
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\Debug\List\hmac_sha1.lst
+#    Object file  =  
+#        C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\prj\iar\Debug\Obj\hmac_sha1.o
+#
+###############################################################################
+
+C:\Users\bchen-adm\Desktop\nsac-hiftl-dc\core\ftl\hmac_sha1.c
+      1          /**
+      2          * @file hmac_sha1.c  Implements HMAC-SHA1 as of RFC 2202
+      3          *
+      4          * Copyright (C) 2010 Creytiv.com
+      5          */
+      6          #include <string.h>
+      7          #include <stdint.h>
+      8          
+      9          #ifdef USE_OPENSSL
+     10          #include <openssl/sha.h>
+     11          #include <openssl/hmac.h>
+     12          #include <openssl/err.h>
+     13          #else
+     14          
+     15          #include "sha.h"
+     16          
+     17          #endif
+     18          
+     19          #include "hmac.h"
+     20          
+     21          
+     22          /** SHA-1 Block size */
+     23          #ifndef SHA_BLOCKSIZE
+     24          #define SHA_BLOCKSIZE   (64)
+     25          #endif
+     26          
+     27          
+     28          /**
+     29          * Function to compute the digest
+     30          *
+     31          * @param k   Secret key
+     32          * @param lk  Length of the key in bytes
+     33          * @param d   Data
+     34          * @param ld  Length of data in bytes
+     35          * @param out Digest output
+     36          * @param t   Size of digest output
+     37          */
+     38          void hmac_sha1(const uint8_t *k,  /* secret key */
+     39                  size_t lk,       /* length of the key in bytes */
+     40                  const uint8_t *d,  /* data */
+     41                  size_t ld,       /* length of data in bytes */
+     42                  uint8_t *out,      /* output buffer, at least "t" bytes */
+     43                  size_t *t) {
+     44          #ifdef USE_OPENSSL
+     45          
+     46          	if (!HMAC(EVP_sha1(), k, (int)lk, d, ld, out, t)) {
+     47          		ERR_clear_error();
+     48          	}
+     49          #else
+     50              SHA_CTX ictx, octx;
+     51              uint8_t isha[SHA_DIGEST_LENGTH], osha[SHA_DIGEST_LENGTH];
+     52              uint8_t key[SHA_DIGEST_LENGTH];
+     53              uint8_t buf[SHA_BLOCKSIZE];
+     54              size_t i;
+     55          
+     56              if (lk > SHA_BLOCKSIZE) {
+     57                  SHA_CTX tctx;
+     58          
+     59                  SHA1_Init(&tctx);
+     60                  SHA1_Update(&tctx, k, lk);
+     61                  SHA1_Final(key, &tctx);
+     62          
+     63                  k = key;
+     64                  lk = SHA_DIGEST_LENGTH;
+     65              }
+     66          
+     67              /**** Inner Digest ****/
+     68          
+     69              SHA1_Init(&ictx);
+     70          
+     71              /* Pad the key for inner digest */
+     72              for (i = 0; i < lk; ++i) {
+     73                  buf[i] = k[i] ^ 0x36;
+     74              }
+     75              for (i = lk; i < SHA_BLOCKSIZE; ++i) {
+     76                  buf[i] = 0x36;
+     77              }
+     78          
+     79              SHA1_Update(&ictx, buf, SHA_BLOCKSIZE);
+     80              SHA1_Update(&ictx, d, ld);
+     81          
+     82              SHA1_Final(isha, &ictx);
+     83          
+     84              /**** Outer Digest ****/
+     85          
+     86              SHA1_Init(&octx);
+     87          
+     88              /* Pad the key for outter digest */
+     89          
+     90              for (i = 0; i < lk; ++i) {
+     91                  buf[i] = k[i] ^ 0x5c;
+     92              }
+     93              for (i = lk; i < SHA_BLOCKSIZE; ++i) {
+     94                  buf[i] = 0x5c;
+     95              }
+     96          
+     97              SHA1_Update(&octx, buf, SHA_BLOCKSIZE);
+     98              SHA1_Update(&octx, isha, SHA_DIGEST_LENGTH);
+     99          
+    100              SHA1_Final(osha, &octx);
+    101          
+    102              /* truncate and print the results */
+    103              *t = *t > SHA_DIGEST_LENGTH ? SHA_DIGEST_LENGTH : *t;
+    104              memcpy(out, osha, *t);
+    105          #endif
+    106          }
+
+   Maximum stack usage in bytes:
+
+   .cstack Function
+   ------- --------
+     424   hmac_sha1
+       424   -> SHA1_Final
+       424   -> SHA1_Init
+       424   -> SHA1_Update
+       424   -> __aeabi_memcpy
+
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+     216  hmac_sha1
+
+ 
+ 216 bytes in section .text
+ 
+ 216 bytes of CODE memory
+
+Errors: none
+Warnings: 1
