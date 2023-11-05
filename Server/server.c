@@ -1,5 +1,11 @@
-#define _GNU_SOURCE
+/*
+ *
+ *
+ *
+ *
+ */
 
+#define _GNU_SOURCE
 #define PATH "/dev/sdb"
 #include <stdlib.h>
 #include <stdio.h>
@@ -13,7 +19,8 @@
 #include "defs.h"
 #include <time.h>
 
-void ftl_initial(uint8_t *sgx_pubKey, uint8_t *ftl_pubKey) {
+void ftl_initial(uint8_t *sgx_pubKey, uint8_t *ftl_pubKey) 
+{
 
     int fd; 
     if((fd = open(PATH, O_RDWR | O_DIRECT)) == -1) {
@@ -73,7 +80,8 @@ void ftl_initial(uint8_t *sgx_pubKey, uint8_t *ftl_pubKey) {
     return;
 }
 
-void get_challnum(int server_fd) {
+void get_challnum(int server_fd) 
+{
 
     int client_fd;
     uint8_t challnum[KEY_SIZE];
@@ -121,10 +129,11 @@ void get_challnum(int server_fd) {
 
 }
 
-void get_page(int server_fd) {
+void get_segment(int server_fd) 
+{
 
     int client_fd;
-    uint8_t pageData[PAGE_SIZE];
+    uint8_t segData[SEGMENT_SIZE];
     uint8_t buffer[BUFFER_SIZE];
 
     /* Recieve fileName */
@@ -136,12 +145,12 @@ void get_page(int server_fd) {
     strncpy(fileName, buffer, fileNameLen);
     fileName[fileNameLen] = '\0';
 
-    /* Recieve pageNum */
-    int pageNum;
+    /* Recieve segNum */
+    int segNum;
     client_fd = accept_connection(server_fd);
-    read(client_fd, &pageNum, sizeof(int));
+    read(client_fd, &segNum, sizeof(int));
     close(client_fd);
-    printf("Page number recieved: %d\n", pageNum);
+    printf("Segment number recieved: %d\n", segNum);
     /* Open device */
     int fd;
     if ((fd = open(PATH, O_RDWR | O_DIRECT)) == -1) {
@@ -149,23 +158,23 @@ void get_page(int server_fd) {
         return;
     }
 
-    off_t offset = pageNum * PAGE_SIZE; /* Page offset */
+    off_t offset = segNum * SEGMENT_SIZE; /* Segment offset */
     void *buf;
-    if (posix_memalign(&buf, PAGE_SIZE, PAGE_SIZE) != 0) {
+    if (posix_memalign(&buf, SEGMENT_SIZE, SEGMENT_SIZE) != 0) {
         perror("[posix_memalign]");
         close(fd);
         return;
     }
 
-    /* Write pageNum to address 951396 */ // TODO: THIS BAD. ONLY DO THIS DURING AUDIT, ?? maybe good now????
-    if (lseek(fd, 951396 * PAGE_SIZE, SEEK_SET) == -1) {
+    /* Write segNum to address 951396 */ // TODO: THIS BAD. ONLY DO THIS DURING AUDIT, ?? maybe good now????
+    if (lseek(fd, 951396 * SEGMENT_SIZE, SEEK_SET) == -1) {
         perror("[lseek]");
         close(fd);
         return;
     }
 
-    memcpy(buf, &pageNum, sizeof(pageNum));
-    if (write(fd, buf, PAGE_SIZE) == -1) {
+    memcpy(buf, &segNum, sizeof(segNum));
+    if (write(fd, buf, SEGMENT_SIZE) == -1) {
         perror("[write]");
         close(fd);
         return;
@@ -174,7 +183,7 @@ void get_page(int server_fd) {
   //struct timeval start, end;
     //gettimeofday(&start, NULL);
 
-    if (pread(fd, buf, PAGE_SIZE, offset) == -1) { 
+    if (pread(fd, buf, SEGMENT_SIZE, offset) == -1) { 
         perror("[pread]");
         free(buf);
         close(fd);
@@ -187,24 +196,24 @@ void get_page(int server_fd) {
     //long seconds = end.tv_sec - start.tv_sec;
     //long micros = ((seconds * 1000000) + end.tv_usec) - (start.tv_usec);
 
-    //printf("Time elapsed Get page: %ld.%06ld seconds\n", seconds, micros);
+    //printf("Time elapsed Get segment: %ld.%06ld seconds\n", seconds, micros);
 
 
-    memcpy(pageData, buf, PAGE_SIZE);
+    memcpy(segData, buf, SEGMENT_SIZE);
 
-    // printf("Page data encrypted??\n");
-    // for(int i = 0; i < PAGE_SIZE; i++) {
-    //     printf("%x", pageData[i]);
+    // printf("Segment data encrypted??\n");
+    // for(int i = 0; i < SEGMENT_SIZE; i++) {
+    //     printf("%x", segData[i]);
     // }
     // printf("\n");
 
     close(fd);
 
-    /* Send data at pageNum */
+    /* Send data at segNum */
     client_fd = accept_connection(server_fd);
     ssize_t total_sent = 0;
-    while (total_sent < PAGE_SIZE) {
-        ssize_t sent = write(client_fd, pageData + total_sent, PAGE_SIZE - total_sent);
+    while (total_sent < SEGMENT_SIZE) {
+        ssize_t sent = write(client_fd, segData + total_sent, SEGMENT_SIZE - total_sent);
         if (sent == -1) {
             // handle error
             break;
@@ -215,7 +224,8 @@ void get_page(int server_fd) {
 
 }
 
-void file_init(int server_fd) {
+void file_init(int server_fd) 
+{
     int client_fd;
     uint8_t buffer[8192];
     
@@ -278,8 +288,8 @@ void file_init(int server_fd) {
 
     // Receive each sigma
     uint8_t sigma[numBlocks][PRIME_LENGTH / 8];
-    const int bytesPerPage = 512;
-    const int sigPerPage = (bytesPerPage) / (PRIME_LENGTH / 8);
+    const int bytesPerSeg = 512;
+    const int sigPerSeg = (bytesPerSeg) / (PRIME_LENGTH / 8);
     int sigCount = 0;
     for (int i = 0; i < numBlocks; i++) {
         
@@ -299,14 +309,14 @@ void file_init(int server_fd) {
         }
         sigCount++;
 
-        if (sigCount % sigPerPage == 0) {
-            // Calculate the number of bytes to write to fill the current page
+        if (sigCount % sigPerSeg == 0) {
+            // Calculate the number of bytes to write to fill the current segment
             int bytesWritten = (sigCount * (PRIME_LENGTH / 8));
-            int bytesToFillPage = bytesPerPage - (bytesWritten % bytesPerPage);
-            if (bytesToFillPage != bytesPerPage) {
-                uint8_t buffer[bytesToFillPage];
-                memset(buffer, 0, bytesToFillPage);
-                if (write(fd, buffer, bytesToFillPage) == -1) {
+            int bytesToFillSeg = bytesPerSeg - (bytesWritten % bytesPerSeg);
+            if (bytesToFillSeg != bytesPerSeg) {
+                uint8_t buffer[bytesToFillSeg];
+                memset(buffer, 0, bytesToFillSeg);
+                if (write(fd, buffer, bytesToFillSeg) == -1) {
                     perror("[write]");
                     close(fd);
                     return;
@@ -315,15 +325,15 @@ void file_init(int server_fd) {
         }
     }
 
-    // Seek to next 512 byte page
+    // Seek to next 512 byte segment
     off_t pos = lseek(fd, 0, SEEK_CUR);
     if (pos == -1) {
         perror("[lseek]");
         close(fd);
         return;
     }
-    off_t nextPageStart = ((pos / bytesPerPage) + 1) * bytesPerPage;
-    off_t bytesToSkip = nextPageStart - pos;
+    off_t nextSegStart = ((pos / bytesPerSeg) + 1) * bytesPerSeg;
+    off_t bytesToSkip = nextSegStart - pos;
     if (lseek(fd, bytesToSkip, SEEK_CUR) == -1) {
         perror("[lseek]");
         close(fd);
@@ -352,7 +362,8 @@ void file_init(int server_fd) {
     return 0;
 }
 
-void ftl_init(int server_fd) {
+void ftl_init(int server_fd) 
+{
     int client_fd;
     uint8_t sgx_pubKey[64] = {0};
     uint8_t *ftl_pubKey = malloc(sizeof(uint8_t) * 64);
@@ -373,7 +384,8 @@ void ftl_init(int server_fd) {
     free(ftl_pubKey);
 }
 
-void state_2(int server_fd) {
+void state_2(int server_fd) 
+{
     int client_fd;
 
     int numBits = 0;
@@ -388,23 +400,23 @@ void state_2(int server_fd) {
         return;
     }
 
-    off_t offset = 951400 * PAGE_SIZE; /* Page offset */
+    off_t offset = 951400 * SEGMENT_SIZE; /* Segment offset */
     void *buf;
-    if (posix_memalign(&buf, PAGE_SIZE, PAGE_SIZE) != 0) {
+    if (posix_memalign(&buf, SEGMENT_SIZE, SEGMENT_SIZE) != 0) {
         perror("[posix_memalign]");
         close(fd);
         return;
     }
 
-    /* Write pageNum to address 951396 */
-    if (lseek(fd, 951400 * PAGE_SIZE, SEEK_SET) == -1) {
+    /* Write segNum to address 951396 */
+    if (lseek(fd, 951400 * SEGMENT_SIZE, SEEK_SET) == -1) {
         perror("[lseek]");
         close(fd);
         return;
     }
 
     memcpy(buf, &numBits, sizeof(numBits));
-    if (write(fd, buf, PAGE_SIZE) == -1) {
+    if (write(fd, buf, SEGMENT_SIZE) == -1) {
         perror("[write]");
         close(fd);
         return;
@@ -413,7 +425,8 @@ void state_2(int server_fd) {
 
 }
 
-void write_parity(int server_fd) {
+void write_parity(int server_fd) 
+{
 
     int client_fd;
     uint8_t buffer[8192];
@@ -476,8 +489,8 @@ void write_parity(int server_fd) {
 
 }
 
-main() {
-
+main() 
+{
     int server_fd, client_fd;
     server_fd = create_socket();
     uint8_t buffer[BUFFER_SIZE];
@@ -498,9 +511,9 @@ main() {
             printf("file_init\n");
             file_init(server_fd);
         }
-        else if(strcmp(command, "get_page") == 0) {
-            printf("get page\n");
-            get_page(server_fd);
+        else if(strcmp(command, "get_segment") == 0) {
+            printf("get segment\n");
+            get_segment(server_fd);
         }
         else if(strcmp(command, "get_nonce") == 0 ) {
             printf("get nonce\n");

@@ -19,13 +19,13 @@ enclave {
 
 		void ocall_ftl_init([in, count=64] uint8_t *sgx_pubKey, [out,count=64] uint8_t *ftl_pubKey);
 
-		void ocall_get_block([out, count=4096] uint8_t *data, size_t pageSize, int pagePerBlock, int blockNum,[in, size=1024] char *fileName);
+		void ocall_get_block([out, count=4096] uint8_t *data, size_t segSize, int segPerBlock, int blockNum,[in, size=1024] char *fileName);
 
 		void ocall_printf([in, count=size] unsigned char *buffer, size_t size, int type);
 
 		void ocall_send_nonce([in, count=16] uint8_t *nonce);
 
-		void ocall_get_page([in, string] const char *fileName, int pageNum,[out, size=PAGE_SIZE] uint8_t *pageData);
+		void ocall_get_segment([in, string] const char *fileName, int segNum,[out, size=SEGMENT_SIZE] uint8_t *segData);
 
 		void ocall_init_parity(int numBits);
 

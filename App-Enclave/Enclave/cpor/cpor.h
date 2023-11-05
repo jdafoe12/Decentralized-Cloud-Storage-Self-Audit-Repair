@@ -10,7 +10,7 @@ void prepare_tag(Tag *tag, PorSK porSk);
 
 void decrypt_tag(Tag *tag, PorSK porSk);
 
-void gen_challenge(int totalPages, uint8_t *indices, uint8_t *coefficients, uint8_t *prime);
+void gen_challenge(int totalSegments, uint8_t *indices, uint8_t *coefficients, uint8_t *prime);
 
 //void getRandomByPRF(char* key, int length_key, unsigned char *i, int length_input, BIGNUM *p, BIGNUM *rand);
 void generate_random_mod_p(char* prf_key, int key_len, unsigned char *i, int i_len, BIGNUM *p, BIGNUM *result);

@@ -23,7 +23,8 @@
 
 
 
-void ocall_write_parity(uint16_t *data, int blocksInGroup, int  groupNum) {
+void ocall_write_parity(uint16_t *data, int blocksInGroup, int  groupNum) 
+{
 
 	int client_fd;
 
@@ -73,7 +74,8 @@ void ocall_write_parity(uint16_t *data, int blocksInGroup, int  groupNum) {
 
 }
 
-void ocall_init_parity(int numBits) {
+void ocall_init_parity(int numBits) 
+{
 	send_data_to_server("state_2", 8);
 	send_data_to_server(&numBits, sizeof(int)); // TODO: write response on server side in VM.
 }
@@ -86,7 +88,8 @@ void ocall_init_parity(int numBits) {
  *
  * No returns
  */
-void ocall_send_nonce(uint8_t *nonce) {
+void ocall_send_nonce(uint8_t *nonce) 
+{
 
 
 	/* Call server function get_challnum*/
@@ -96,29 +99,29 @@ void ocall_send_nonce(uint8_t *nonce) {
 	send_data_to_server(nonce, sizeof(uint8_t) * KEY_SIZE);
 }
 
-void ocall_get_page(const char *fileName, int pageNum, uint8_t *pageData) {
+void ocall_get_segment(const char *fileName, int segNum, uint8_t *segData) 
+{
 
-    //printf("Get page number %d\n", pageNum);
-    /* Call server function get_page */
-    send_data_to_server("get_page", 8);
+    /* Call server function get_segment */
+    send_data_to_server("get_segment", 11);
 
     /* Send fileName to server*/
     send_data_to_server(fileName, strlen(fileName));
 
-    /* Send pageNum to server*/
-    send_data_to_server(&pageNum, sizeof(int));
-    /* Recieve pageData from server */
+    /* Send segNum to server*/
+    send_data_to_server(&segNum, sizeof(int));
+    /* Recieve segData from server */
     uint8_t *temp;
-    temp = (uint8_t *) receive_data_from_server(PAGE_SIZE);
+    temp = (uint8_t *) receive_data_from_server(SEGMENT_SIZE);
 
     if (temp != NULL) {
-        memcpy(pageData, temp, PAGE_SIZE);
+        memcpy(segData, temp, SEGMENT_SIZE);
         free(temp);
     } else {
         // handle error
     }
 
-    //printf("Page data: ");
+    //printf("segment data: ");
 }
 
 /*
@@ -126,7 +129,8 @@ void ocall_get_page(const char *fileName, int pageNum, uint8_t *pageData) {
  *
  * Implicit return : Populate uint8_t data with the data from the requested block in the specified file.
  */
-void ocall_get_block(uint8_t *data, size_t pageSize, int pagePerBlock, int blockNum, char *fileName) {
+void ocall_get_block(uint8_t *data, size_t segSize, int segPerBlock, int blockNum, char *fileName) 
+{
 
     // Open the necessary file for reading
     int fd = open(fileName, O_RDONLY);
@@ -136,7 +140,7 @@ void ocall_get_block(uint8_t *data, size_t pageSize, int pagePerBlock, int block
     }
 
     // Go to block offset
-    off_t offset = blockNum * (off_t) pageSize * pagePerBlock;
+    off_t offset = blockNum * (off_t) segSize * segPerBlock;
     if (lseek(fd, offset, SEEK_SET) == (off_t) -1) {
         printf("Error: cannot seek to offset %lld in file %s\n", (long long) offset, fileName);
         close(fd);
@@ -144,8 +148,8 @@ void ocall_get_block(uint8_t *data, size_t pageSize, int pagePerBlock, int block
     }
 
     // Read data into buffer
-    uint8_t buffer[pageSize * pagePerBlock];
-    ssize_t bytesRead = read(fd, buffer, pageSize * pagePerBlock);
+    uint8_t buffer[segSize * segPerBlock];
+    ssize_t bytesRead = read(fd, buffer, segSize * segPerBlock);
     if (bytesRead < 0) {
         printf("Error: cannot read file %s\n", fileName);
         close(fd);
@@ -155,7 +159,7 @@ void ocall_get_block(uint8_t *data, size_t pageSize, int pagePerBlock, int block
 
     // Copy buffer into data arr
 
-    memcpy(data, buffer, pageSize * pagePerBlock);
+    memcpy(data, buffer, segSize * segPerBlock);
 
 }
 
@@ -169,7 +173,8 @@ void ocall_get_block(uint8_t *data, size_t pageSize, int pagePerBlock, int block
  *
  * Implicit return : Populates ftl_pubkey with the storage device public ecc key.
  */
-void ocall_ftl_init(uint8_t *sgx_pubKey, uint8_t *ftl_pubKey) {
+void ocall_ftl_init(uint8_t *sgx_pubKey, uint8_t *ftl_pubKey) 
+{
 
     int client_fd;
     struct timeval start_time, end_time;
@@ -206,7 +211,8 @@ void ocall_ftl_init(uint8_t *sgx_pubKey, uint8_t *ftl_pubKey) {
 }
 
 /* Used for debugging purposes, to print a value within the enclave */
-void ocall_printf(unsigned char *buffer, size_t size, int type) {
+void ocall_printf(unsigned char *buffer, size_t size, int type) 
+{
 	if(type == 1){
 		for(int i = 0; i < (int)size; i++) {
 			printf("%x", buffer[i]);
@@ -231,7 +237,8 @@ void ocall_printf(unsigned char *buffer, size_t size, int type) {
  * Implicit returns : Writes the file and POR data to the storage device. Calls ecall_file_init,
  * Which initializes many values in the enclave.
  */
-void app_file_init(sgx_enclave_id_t eid, const char *fileName,  int numBlocks) {
+void app_file_init(sgx_enclave_id_t eid, const char *fileName,  int numBlocks) 
+{
 
     sgx_status_t status;
 
@@ -359,7 +366,8 @@ void app_file_init(sgx_enclave_id_t eid, const char *fileName,  int numBlocks) {
 
 
 
-int main(void) {
+int main(void) 
+{
     //struct timeval start_time, end_time;
     //double cpu_time_used;
     //int waittime;

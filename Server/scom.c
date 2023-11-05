@@ -11,13 +11,15 @@
 #include <sys/socket.h>
 #include <string.h>
 
-void error(const char *msg) {
+void error(const char *msg) 
+{
     perror(msg);
     exit(EXIT_FAILURE);
 }
 
 
-int create_socket() {
+int create_socket() 
+{
     int server_fd, opt = 1;
     struct sockaddr_in address;
     
@@ -48,7 +50,8 @@ int create_socket() {
     return server_fd;
 }
 
-int accept_connection(int server_fd) {
+int accept_connection(int server_fd) 
+{
     int new_socket;
     struct sockaddr_in address;
     int addrlen = sizeof(address);
@@ -63,12 +66,14 @@ int accept_connection(int server_fd) {
 }
 
 
-void send_message(int client_fd, uint8_t *message, size_t size) {
+void send_message(int client_fd, uint8_t *message, size_t size) 
+{
     // Send a message to the client
     send(client_fd, message, size, 0);
 }
 
-void close_socket(int client_fd, int server_fd) {
+void close_socket(int client_fd, int server_fd) 
+{
     // Close the client socket
     close(client_fd);
 
