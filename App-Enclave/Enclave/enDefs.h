@@ -12,9 +12,12 @@ typedef struct PorSK {
 	uint8_t sortKey[KEY_SIZE]; // Note if used for all files, the same block numbers in different files will be permuted the same.
 } PorSK;
 
+// n and k are the erasure code parameters for an (n, k) erasure code.
 typedef struct File {
 	int inUse;
 	int numBlocks;
+	int n;
+	int k;
 	char fileName[FILE_NAME_LEN];
 	uint8_t prime[PRIME_LENGTH / 8];
 } File;

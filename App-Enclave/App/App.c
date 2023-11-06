@@ -23,32 +23,29 @@
 
 
 
-void ocall_write_parity(uint16_t *data, int blocksInGroup, int  groupNum) 
+void ocall_write_parity(uint16_t *data, int numParityBlocks, int  startPage) 
 {
 
 	int client_fd;
 
-
-	/* Call file initialization function on server */
 	client_fd = create_client_socket();
     connect_to_server(client_fd);
 	write(client_fd, "write_parity", 12);
 	close(client_fd);
 
-    /* Send file name and number of blocks to server function file_init */
 	client_fd = create_client_socket();
 	connect_to_server(client_fd);
-    write(client_fd, &groupNum, sizeof(groupNum)); /* groupNum */
+    write(client_fd, &startPage, sizeof(startPage)); /* startPage */
 	close(client_fd);
 
 
 	client_fd = create_client_socket();
 	connect_to_server(client_fd);
-    write(client_fd, &blocksInGroup, sizeof(blocksInGroup)); /* Send number of blocks */
+    write(client_fd, &numParityBlocks, sizeof(numParityBlocks)); /* Send number of parity blocks */
 	close(client_fd);
 
     /* Send each block data to the server */
-    for (int i = 0; i < blocksInGroup; i++) {
+    for (int i = 0; i < numParityBlocks; i++) {
         /* Read the i-th block from the file into blockData */
 
         /* Send the i-th block to the server */

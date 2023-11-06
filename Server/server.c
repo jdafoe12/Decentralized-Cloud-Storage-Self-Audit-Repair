@@ -249,16 +249,16 @@ void file_init(int server_fd)
     fileName[fileNameLen] = '\0';
 
     // Receive number of blocks
-    int numBlocks;
+    int numParityBlocks;
 
     client_fd = accept_connection(server_fd);
-    read(client_fd, &numBlocks, sizeof(numBlocks));
+    read(client_fd, &numParityBlocks, sizeof(numParityBlocks));
     close(client_fd);
 
 
     // Receive each block
     uint8_t blockData[BLOCK_SIZE];
-    for (int i = 0; i < numBlocks; i++) {
+    for (int i = 0; i < numParityBlocks; i++) {
 
 	    client_fd = accept_connection(server_fd);
         int bytes_received = 0;
@@ -287,11 +287,11 @@ void file_init(int server_fd)
     }
 
     // Receive each sigma
-    uint8_t sigma[numBlocks][PRIME_LENGTH / 8];
+    uint8_t sigma[numParityBlocks][PRIME_LENGTH / 8];
     const int bytesPerSeg = 512;
     const int sigPerSeg = (bytesPerSeg) / (PRIME_LENGTH / 8);
     int sigCount = 0;
-    for (int i = 0; i < numBlocks; i++) {
+    for (int i = 0; i < numParityBlocks; i++) {
         
         client_fd = accept_connection(server_fd);
 
@@ -442,24 +442,24 @@ void write_parity(int server_fd)
 
 
 
-    int groupNum = 0;
+    int startPage = 0;
     // Receive file name
     client_fd = accept_connection(server_fd);
-    int fileNameLen = read(client_fd, groupNum, sizeof(groupNum));
+    int fileNameLen = read(client_fd, startPage, sizeof(startPage));
     close(client_fd);
 
     // Receive number of blocks
-    int numBlocks;
+    int numParityBlocks;
 
     client_fd = accept_connection(server_fd);
-    read(client_fd, &numBlocks, sizeof(numBlocks));
+    read(client_fd, &numParityBlocks, sizeof(numParityBlocks));
     close(client_fd);
 
-    lseek(fd, 230000 + (numBlocks * groupNum), SEEK_SET);
+    lseek(fd, 230000 + (startPage), SEEK_SET);
 
     // Receive each block
     uint8_t blockData[BLOCK_SIZE];
-    for (int i = 0; i < numBlocks; i++) {
+    for (int i = 0; i < numParityBlocks; i++) {
 
 	    client_fd = accept_connection(server_fd);
         int bytes_received = 0;

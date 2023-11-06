@@ -66,7 +66,7 @@ void prepare_tag(Tag *tag, PorSK porSk)
     int mac_data_len[3] = { sizeof(tag->n), KEY_SIZE, (PRIME_LENGTH / 8) * SEGMENT_PER_BLOCK };
     uint8_t mac[MAC_SIZE];
     int mac_len;
-    EVP_DigestInit_ex(md_ctx, md, NULL);
+
     EVP_DigestUpdate(md_ctx, porSk.macKey, MAC_SIZE);
     for (int i = 0; i < 3; i++) {
         EVP_DigestUpdate(md_ctx, mac_data[i], mac_data_len[i]);

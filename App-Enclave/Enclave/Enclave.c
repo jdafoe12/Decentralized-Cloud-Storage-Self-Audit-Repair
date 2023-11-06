@@ -308,6 +308,7 @@ void generate_file_parity(int fileNum)
 	uint8_t segData[SEGMENT_SIZE];
     uint8_t groupData[maxBlocksPerGroup * SEGMENT_PER_BLOCK * SEGMENT_SIZE];
 
+	int startPage = 0; // TODO: This should start at start of parity for file. This can be calculated based on defined values and data in files struct.
     for (int group = 0; group < numGroups; group++) {
 
         blocksInGroup = 0;
@@ -399,6 +400,7 @@ void generate_file_parity(int fileNum)
 
 		if(audit_block_group(fileNum, blocksInGroup, groups[group], sigmas, tag, groupData) != 0) {
 			// Invalid data. Handle error.
+			ocall_printf("AUDIT FAILED!!", 15, 0)
 		}
 
 		// Setup RS parameters
@@ -417,6 +419,7 @@ void generate_file_parity(int fileNum)
 		int symbolsPerSegment = SEGMENT_SIZE / bytesPerSymbol;
         int numDataSymbols = groupByteSize / bytesPerSymbol;
         int totalSymbols = numDataSymbols + nroots;
+		int numParityBlocks = ceil(nroots / (BLOCK_SIZE - MAC_SIZE));
 
     	void *rs = init_rs_int(symSize, gfpoly, fcr, prim, nroots, pow(2, symSize) - (totalSymbols + 1));
 
@@ -433,8 +436,48 @@ void generate_file_parity(int fileNum)
 		// TODO: just test that all the right data are in the right places in the end
 		// TODO: verify this works, add authentication, and refine the locations on this!
 		
-		// TODO: encrypt data before sending it. FTL will decrypt upon recieving the parity data.
-		ocall_write_parity((uint16_t *) symbolData, blocksInGroup, group); // This assumes groups are all same size.
+		// TODO: encrypt parity before sending it. FTL will store it encrypted.
+		// TODO: This data needs to be sent in such a way that the FTL knows 
+		// it all came from the SGX... To do this, I will additionally send the parity with a MAC.
+
+		uint8_t* tempParityData = (uint8_t*)malloc(numParitySymbols * bytesPerSymbol);
+
+		for (int currentSymbol = numDataSymbols; currentSymbol < totalSymbols; currentSymbol++) {
+			for(int i = 0; i < bytesPerSymbol; i++) {
+    			tempParityData[((currentSymbol * bytesPerSymbol) - (numDataSymbols * bytesPerSymbol)) + i] = (symbolData[currentSymbol] >> ((bytesPerSymbol - (i + 1)) * 8)) & 0xFF;
+			}
+		}
+
+		uint8_t parityData[numParityBlocks][BLOCK_SIZE];
+		EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+		EVP_MD_CTX* md_ctx = EVP_MD_CTX_new();
+		const EVP_MD* md = EVP_sha1();
+		const unsigned char iv[] = "0123456789abcdef";
+
+		for (int i = 0; i < numParityBlocks; i++) {
+			int mac_len;
+
+			// Generate MAC
+			EVP_DigestInit_ex(md_ctx, md, NULL);
+			EVP_DigestUpdate(md_ctx, porSk.macKey, MAC_SIZE);
+			EVP_DigestUpdate(md_ctx, tempParityData + ((BLOCK_SIZE - MAC_SIZE) * i), BLOCK_SIZE - MAC_SIZE);
+			EVP_DigestFinal_ex(md_ctx, parityData[i] + (BLOCK_SIZE - MAC_SIZE), &mac_len);
+			memcpy(parityData[i], tempParityData + ((BLOCK_SIZE - MAC_SIZE) * i), BLOCK_SIZE - MAC_SIZE);
+
+			// Encrypt the data
+			EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, porSK.encKey, iv); // TODO: use same keys when decoding
+			EVP_EncryptUpdate(ctx, parityData[i], &out_len, tempParityData + (i * BLOCK_SIZE), BLOCK_SIZE);
+		}
+
+		// TODO: protect this write with an encrypted passcode (the key needs to change each time) that the FTL can verify.
+		// Note: this should be based on a shared counter in some way (start at a nonce value and increment).
+		// Also, this may require some refactorization, as this cannot be done in untrusted app.
+		// Will need to write each page individually. The key needs to be included in the write,
+		// so the size needs to be accounted for, make sure though, that FTL stores the data as expected. (with each block ending in a MAC)
+		ocall_write_parity((uint16_t *) symbolData + numDataSymbols, numParityBlocks, startPage);
+
+		startPage += numParityBlocks * PAGE_PER_BLOCK;
+
 		free_rs_int(rs);
     	free(symbolData);
 
