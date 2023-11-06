@@ -238,9 +238,9 @@ void generate_file_parity(int fileNum)
         }
 
         for (int groupBlock = 0; groupBlock < maxBlocksPerGroup; groupBlock++) { 
-            blockNum = groups[group][groupBlock] - 1; // TODO: I shouldn't need -1 here. Change get_groups to do this better. (use -1 for empty instead of 0??)
+            blockNum = groups[group][groupBlock];
             ocall_printf(&blockNum, 4, 1);
-            if (groups[group][groupBlock] == -1) {
+            if (groups[group][groupBlock] == -1) { // This group is not full (it has less than maxBlocksPerGroup blocks). 
                 continue;
             }
             blocksInGroup++;
@@ -252,87 +252,67 @@ void generate_file_parity(int fileNum)
                 //ocall_printf(&permutedPageNum, sizeof(int), 1);
 
                 for (int pageSeg = 0; pageSeg < SEGMENT_PER_BLOCK / PAGE_PER_BLOCK; pageSeg++) {
-                    segNum = (permutedPageNum * 4) + pageSeg;
-                    // TODO: Make this more robust to support multiple files. Have a starting block number for each file.
+                    segNum = (permutedPageNum * SEGMENT_PER_PAGE) + pageSeg;
                     ocall_get_segment(files[fileNum].fileName, segNum, segData);
 					ocall_printf("THE ENCRYPTED DATA ARE:\n", 25, 0);
                     ocall_printf(segData, SEGMENT_SIZE, 1);
 					ocall_printf("--------------------------------------------\n\n\n", 50, 0);
-                    // TODO: Make sure the entire page is encrypted by FTL. Make sure it is decrypted properly.
-                    // TODO: Perform an integrity check on the *BLOCKS* as they are received. This will be challenging, still have to hide location of tags, etc. This functionality needs to be extracted out of existing code.
 
-                    DecryptData((uint32_t *)sharedKey, segData, SEGMENT_SIZE);
+                    // TODO: Perform an integrity check on the *BLOCKS* as they are received. 
+					// This will be challenging, still have to hide location of tags, etc. 
+					// This functionality needs to be extracted out of existing code.
+					// Maybe there is somefunctionality I can extract from here: get a block and audit it's integrity.
+
+                    DecryptData((uint32_t *)sharedKey, segData, SEGMENT_SIZE); // TODO: check that decrypted data are same as original.
 
                     // Copy segData into groupData
 					int blockOffset = groupBlock * SEGMENT_PER_BLOCK * SEGMENT_SIZE;
 					int pageOffset = blockPage * (SEGMENT_PER_BLOCK / PAGE_PER_BLOCK) * SEGMENT_SIZE;
 					int segOffset = pageSeg * SEGMENT_SIZE;
-
                     memcpy(groupData + blockOffset + pageOffset + segOffset, segData, SEGMENT_SIZE);
                 }
             }
         }
 
         // groupData now has group data.
-        int groupByteSize = blocksInGroup * BLOCK_SIZE; // (204480)
-        int symsize = 16;
-        int gfpoly = 0x1100B;     
-		int fcr = 5;       
-		int prim = 1;  
-		int nroots = (groupByteSize / 2) / 2;
-        int numDataSymbols = groupByteSize / 2;
+		// Setup RS parameters
+        int groupByteSize = blocksInGroup * BLOCK_SIZE;
+
+        int symSize = 16; // Up to 2^symSize symbols allowed per group.
+						  // symSize should be a power of 2 in all cases.
+        int gfpoly = 0x1100B;
+		int fcr = 5;
+		int prim = 1; 
+		int nroots = (groupByteSize / 2) / 2; // This is the number of parity symbols for the group.
+											  // This should be based on the ECC parameters for the particular file. 
+											  // For now, it is hardcoded as half the group size (a (3, 2) erasure code equivalent)
+											  // Since only one 10 block file is supported so far.
+		int bytesPerSymbol = pow(2, (log2(symSize) - log2(sizeof(uint8_t))))
+		int symbolsPerSegment = SEGMENT_SIZE / bytesPerSymbol;
+        int numDataSymbols = groupByteSize / bytesPerSymbol;
         int totalSymbols = numDataSymbols + nroots;
-    	void *rs = init_rs_int(16, gfpoly, fcr, prim, nroots, 65536 - (totalSymbols + 1));
 
-		int* intData = (int*)malloc(totalSymbols * sizeof(int));
-		// Copy the data from groupData to intData
-		for (int l = 0; l < blocksInGroup * PAGE_PER_BLOCK; l++) {
-   		 // Copy 512 bytes at a time
-    		for (int j = 0; j < 128; j++) {
-        		intData[l * 128 + j] = (int)(groupData[l * 256 + j * 2] | (groupData[l * 256 + j * 2 + 1] << 8)); // TODO: MAKE SURE THIS IS RIGHT
+    	void *rs = init_rs_int(symSize, gfpoly, fcr, prim, nroots, pow(2, symSize) - (totalSymbols + 1));
+
+		int* symbolData = (int*)malloc(totalSymbols * sizeof(int));
+		// Copy the data from groupData to symbolData
+		for (int currentSeg = 0; currentSeg < blocksInGroup * SEGMENT_PER_BLOCK; currentSeg++) {
+    		for (int currentSymbol = currentSeg * symbolsPerSegment; currentSymbol < (symbolsPerSegment * (currentSeg + 1)); currentSymbol++) {
+				int symbolStartAddr = currentSymbol * bytesPerSymbol;
+        		symbolData[currentSymbol] = (int)(groupData[symbolStartAddr] | (groupData[symbolStartAddr + 1] << 8));
     		}
-
-    		ocall_printf("PAGE DATA: \n\n", 14, 0);
-    		ocall_printf(intData + (l * 128), 512, 1);
-    		ocall_printf("--------------------\n\n\n", 24, 0);
 		}
 
-    	encode_rs_int(rs, intData, intData + numDataSymbols);
-
-
-		 for (int l = 0; l < nroots / 256; l++) {
-            ocall_printf("PARITY DATA: \n\n", 16, 0);
-            ocall_printf(intData + (numDataSymbols) + (l * 256), 512, 1);
-            ocall_printf("--------------------\n\n\n", 24, 0);
-        }
-
-
-    	//int ret_val = decode_rs_int(rs, intData, NULL, 0);
-
-		//if (ret_val < 0) {
-    	// Decoding failed, handle the error
- 		//ocall_printf("Decoding failed\n", 18, 0);
-
-		//} else {
-    		// Decoding succeeded, recovered data is in the uint16Data array
-    		//ocall_printf("Decoding succeeded\n", 18, 0);
-    
-
-		//}
-//ocall_printf(&nroots, 4,1);
-//ocall_printf(&totalSymbols, 4, 1);
-
-        // USE LIBRS here to do the encoding.
-        // Generate parity data.
-        // Send parity data to FTL. (and keep track of metadata for how to retrieve (may not be necessary. can likely generate this metadata on the fly).
-	   
-			// TODO: verify this works, add authentication, and refine the locations on this!
-				ocall_write_parity((uint16_t *) intData, blocksInGroup, group); // This assumes groups are all same size.
+    	encode_rs_int(rs, symbolData, symbolData + numDataSymbols);
+		// TODO: just test that all the right data are in the right places in the end
+		// TODO: verify this works, add authentication, and refine the locations on this!
+		
+		// TODO: encrypt data before sending it. FTL will decrypt upon recieving the parity data.
+		ocall_write_parity((uint16_t *) symbolData, blocksInGroup, group); // This assumes groups are all same size.
 		free_rs_int(rs);
-    	free(intData);
+    	free(symbolData);
 
     }
-
     ocall_init_parity(numBits);
 }
 
