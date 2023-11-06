@@ -179,6 +179,86 @@ void get_sigma(BIGNUM *sigma, BIGNUM **data, BIGNUM **alpha, uint8_t blockNum, u
 }
 
 
+int audit_block_group(int fileNum, int numBlocks, int *blockNums, BIGNUM **sigmas, Tag *tag, uint8_t *data) {
+	BIGNUM *coefficients[numBlocks];
+	
+	BIGNUM *bn_coefficient;
+    BIGNUM *bn_prime = BN_bin2bn(files[fileNum].prime, PRIME_LENGTH / 8, NULL);
+    BN_CTX *ctx = BN_CTX_new();
+	BIGNUM *product1 = BN_new();
+	BN_zero(product1);
+	BIGNUM *sigma = BN_new();
+	BN_zero(sigma);
+
+
+	for(int i = 0; i < numBlocks; i++) {
+            coefficients[i] = BN_new();
+            BN_rand_range(coefficients[i], bn_prime);
+			BN_mod_mul(product1, sigmas[i], coefficients[i], bprime, ctx);
+    	    BN_mod_add(sigma, sigma, product1, bprime, ctx);
+	}
+
+	// BIGNUM sigma now contains master sigma!
+	
+	BIGNUM *sum1 = BN_new();
+	BN_zero(sum1);
+	BIGNUM *sum2 = BN_new();
+	BN_zero(sum2);
+	BIGNUM *sigma2 = BN_new();
+	BN_zero(sigma2);
+
+	for(int i = 0; i < numBlocks; i++) {
+		BIGNUM *product2 = BN_new();
+		BN_zero(product2);
+		BIGNUM *blockRand = BN_new();
+		BN_zero(blockRand);
+
+		generate_random_mod_p(tag->prfKey, KEY_SIZE, &blockNums[i], sizeof(uint8_t), bn_prime, blockRand);
+
+		BN_mod_mul(product2, blockRand, coifficients[i], bn_prime, ctx);
+		BN_mod_add(sum1, sum1, product2, bn_prime, ctx);
+		BN_CTX_end(ctx);
+	}
+
+	for(int i = 0; i < numBlocks; i++) {
+		BIGNUM *sum = BN_new();
+		BN_zero(sum);
+		BIGNUM *product3 = BN_new();
+		BN_zero(product3);
+
+		for(int j = 0; j < SEGMENT_PER_BLOCK; j++) {
+
+			BIGNUM *product4 = BN_new();
+			BN_zero(product4);
+			BIGNUM *alpha = BN_new();
+			BN_zero(alpha);
+			BIGNUM *bsegData = BN_new();
+			BN_zero(bsegData);
+			BN_bin2bn(tag->alpha[j], PRIME_LENGTH / 8, alpha);
+
+			// get segment data as bignum
+			BN_bin2bn(segData, SEGMENT_SIZE, data + (i * BLOCK_SIZE) + (j * SEGMENT_SIZE));
+			BN_mod(bsegData, bsegData, bn_prime, ctx);
+			BN_mod_mul(product4, bsegData, alpha, bn_prime, ctx);
+			BN_mod_add(sum, sum, product4, bn_prime, ctx);
+		}
+		BN_mod_mul(product3, sum, coefficients[i], bn_prime, ctx);
+		BN_mod_add(sum2, sum2, product3, bn_prime, ctx);
+	}
+
+	BN_mod_add(sigma2, sum1, sum2, bprime, ctx);
+	BN_CTX_end(ctx);
+
+	uint8_t sigs[PRIME_LENGTH / 8];
+	BN_bn2bin(sigma, sigs);
+	ocall_printf("SIGMA (1 and 2): ", 18, 0);
+	ocall_printf(sigs, PRIME_LENGTH / 8, 1);
+	BN_bn2bin(sigma2, sigs);
+	ocall_printf(sigs, PRIME_LENGTH / 8, 1);
+
+	return BN_cmp(sigma, sigma2);
+}
+
 
 /*
  * Generate parity. Called by ecall_file_init to generate the parity data after sending the file with tags to storage device.
@@ -258,12 +338,12 @@ void generate_file_parity(int fileNum)
                     ocall_printf(segData, SEGMENT_SIZE, 1);
 					ocall_printf("--------------------------------------------\n\n\n", 50, 0);
 
-                    // TODO: Perform an integrity check on the *BLOCKS* as they are received. 
+                    DecryptData((uint32_t *)sharedKey, segData, SEGMENT_SIZE); // TODO: check that decrypted data are same as original.
+
+					// TODO: Perform an integrity check on the *BLOCKS* as they are received. 
 					// This will be challenging, still have to hide location of tags, etc. 
 					// This functionality needs to be extracted out of existing code.
 					// Maybe there is somefunctionality I can extract from here: get a block and audit it's integrity.
-
-                    DecryptData((uint32_t *)sharedKey, segData, SEGMENT_SIZE); // TODO: check that decrypted data are same as original.
 
                     // Copy segData into groupData
 					int blockOffset = groupBlock * SEGMENT_PER_BLOCK * SEGMENT_SIZE;
@@ -275,6 +355,52 @@ void generate_file_parity(int fileNum)
         }
 
         // groupData now has group data.
+
+		// Audit group data
+		
+		// Get sigmas and file tag.
+		const int totalSegments = (files[fileNum].numBlocks * SEGMENT_PER_BLOCK);
+	    int sigPerSeg = floor((double)SEGMENT_SIZE / ((double)PRIME_LENGTH / 8));
+	    int tagSegNum = totalSegments + ceil((double)files[i].numBlocks /(double) sigPerSeg);
+		int tagPageNum = floor(tagSegNum / SEGMENT_PER_PAGE);
+		// Permute tagPageNum
+		permutedPageNum = feistel_network_prp(sharedKey, pageNum, numBits);
+		tagSegNum = (permutedPageNum * SEGMENT_PER_PAGE) + (tagSegNum % tagPageNum) // note, the tag is after the file, 
+																					// so numBits may be wrong
+		ocall_get_segment(files[fileNum].fileName, tagSegNum, segData);
+		DecryptData((uint32_t *)sharedKey, segData, SEGMENT_SIZE); 
+
+		// Note, I will know that tag and sigmas come from FTL, as they are fully encrypted.
+		Tag *tag = (Tag *)malloc(sizeof(Tag));
+	    memcpy(tag, segData, sizeof(Tag));
+	    decrypt_tag(tag, porSK);
+
+		// Get sigmas
+		BIGNUM *sigmas[blocksInGroup];
+
+		for(int i = 0; i < blocksInGroup; i++) {
+			sigmas[i] = BN_new();
+			BN_zero(sigma);
+
+			int startSeg = totalSegments;
+ 	   		int sigSeg = floor(groups[group][i] / sigPerSeg) + startSeg;
+ 	   		int segIndex = groups[group][i] % sigPerSeg;
+
+			uint8_t sigData[SEGMENT_SIZE];
+ 	   		ocall_get_segment(fileName, sigSeg, sigData);
+
+ 	   		DecryptData((uint32_t *)sharedKey, sigData, SEGMENT_SIZE);
+
+			BN_bin2bn(sigData + (sigIndex * (PRIME_LENGTH / 8)), PRIME_LENGTH / 8, sigmas[i]);
+		}
+
+		// TODO: a lot of repeated code between audit_file and here. This is the same between audit_block_group, and audit_file.
+		// Much of this can be refactored to work really well.
+
+		if(audit_block_group(fileNum, blocksInGroup, groups[group], sigmas, tag, groupData) != 0) {
+			// Invalid data. Handle error.
+		}
+
 		// Setup RS parameters
         int groupByteSize = blocksInGroup * BLOCK_SIZE;
 
@@ -525,8 +651,6 @@ void ecall_audit_file(const char *fileName, int *ret)
 		// Handle Error
 	}
 	ocall_send_nonce(challNum);
-
-
 
 	// Generate challenge key using Akagi201/hmac-sha1
 	uint8_t challKey[KEY_SIZE] = {0};
