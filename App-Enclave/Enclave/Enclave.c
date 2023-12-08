@@ -178,7 +178,7 @@ void get_sigma(BIGNUM *sigma, BIGNUM **data, BIGNUM **alpha, uint8_t blockNum, u
 	return;
 }
 
-
+// TODO: Check that this works
 int audit_block_group(int fileNum, int numBlocks, int *blockNums, BIGNUM **sigmas, Tag *tag, uint8_t *data) {
 	BIGNUM *coefficients[numBlocks];
 	
@@ -293,10 +293,10 @@ void generate_file_parity(int fileNum)
     // Generate groups array.
     int numBlocks = files[fileNum].numBlocks;
     int numPages = numBlocks * PAGE_PER_BLOCK;
-	int numGroups = NUM_GROUPS; // TODO: base this off data in file struct.
+	int numGroups = files[fileNum].numGroups; // TODO: base this off data in file struct.
     int numBits = (int)ceil(log2(numPages));
 
-    uint64_t **groups = get_groups(porSK.sortKey, numBlocks, numGroups);
+    uint64_t **groups = get_groups(files[fileNum].sortKey, numBlocks, numGroups);
 
     int blockNum = 0;
     int pageNum = 0;
@@ -411,15 +411,13 @@ void generate_file_parity(int fileNum)
         int gfpoly = 0x1100B;
 		int fcr = 5;
 		int prim = 1; 
-		int nroots = (groupByteSize / 2) / 2; // This is the number of parity symbols for the group.
-											  // This should be based on the ECC parameters for the particular file. 
-											  // For now, it is hardcoded as half the group size (a (3, 2) erasure code equivalent)
-											  // Since only one 10 block file is supported so far.
+		int nroots = (groupByteSize / 2) * ((double) ((double) NUM_TOTAL_SYMBOLS / NUM_ORIGINAL_SYMBOLS) - 1);
+		
 		int bytesPerSymbol = pow(2, (log2(symSize) - log2(sizeof(uint8_t))))
 		int symbolsPerSegment = SEGMENT_SIZE / bytesPerSymbol;
         int numDataSymbols = groupByteSize / bytesPerSymbol;
         int totalSymbols = numDataSymbols + nroots;
-		int numParityBlocks = ceil(nroots / (BLOCK_SIZE - MAC_SIZE));
+		int numParityBlocks = ceil(nroots / BLOCK_SIZE);
 
     	void *rs = init_rs_int(symSize, gfpoly, fcr, prim, nroots, pow(2, symSize) - (totalSymbols + 1));
 
@@ -440,40 +438,90 @@ void generate_file_parity(int fileNum)
 		// TODO: This data needs to be sent in such a way that the FTL knows 
 		// it all came from the SGX... To do this, I will additionally send the parity with a MAC.
 
+		// Place all parity data in tempParityData.
 		uint8_t* tempParityData = (uint8_t*)malloc(numParitySymbols * bytesPerSymbol);
-
 		for (int currentSymbol = numDataSymbols; currentSymbol < totalSymbols; currentSymbol++) {
 			for(int i = 0; i < bytesPerSymbol; i++) {
     			tempParityData[((currentSymbol * bytesPerSymbol) - (numDataSymbols * bytesPerSymbol)) + i] = (symbolData[currentSymbol] >> ((bytesPerSymbol - (i + 1)) * 8)) & 0xFF;
 			}
 		}
 
-		uint8_t parityData[numParityBlocks][BLOCK_SIZE];
+		uint8_t parityData[numParityBlocks + 1][BLOCK_SIZE]; /* The 0th segment of the 0th block contains the following:
+															  * Replay resistant signed magic number (to go back to regular write mode)
+															  * Number of pages of parity data, 
+															  * Nonce for PRF input.
+															  * Proof of data source (extracted secret message).
+															  */
+
+		// Encrypt parity data and place it in parityData array.
 		EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
-		EVP_MD_CTX* md_ctx = EVP_MD_CTX_new();
-		const EVP_MD* md = EVP_sha1();
 		const unsigned char iv[] = "0123456789abcdef";
-
 		for (int i = 0; i < numParityBlocks; i++) {
-			int mac_len;
+    		int out_len;
 
-			// Generate MAC
-			EVP_DigestInit_ex(md_ctx, md, NULL);
-			EVP_DigestUpdate(md_ctx, porSk.macKey, MAC_SIZE);
-			EVP_DigestUpdate(md_ctx, tempParityData + ((BLOCK_SIZE - MAC_SIZE) * i), BLOCK_SIZE - MAC_SIZE);
-			EVP_DigestFinal_ex(md_ctx, parityData[i] + (BLOCK_SIZE - MAC_SIZE), &mac_len);
-			memcpy(parityData[i], tempParityData + ((BLOCK_SIZE - MAC_SIZE) * i), BLOCK_SIZE - MAC_SIZE);
+    		EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, files[fileNum].sortKey, iv);
+    		EVP_EncryptUpdate(ctx, parityData[i], &out_len, tempParityData + (i * BLOCK_SIZE), BLOCK_SIZE);
+		}
+		EVP_CIPHER_CTX_free(ctx);
 
-			// Encrypt the data
-			EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, porSK.encKey, iv); // TODO: use same keys when decoding
-			EVP_EncryptUpdate(ctx, parityData[i], &out_len, tempParityData + (i * BLOCK_SIZE), BLOCK_SIZE);
+		// Prepare parityData[0][0:SEGMENT_SIZE]
+		int loc = 0;
+		// Magic number || Nonce || signature || numPages || Proof
+
+		// Magic number
+		strcpy(parityData[0], PARITY_INDICATOR);
+		loc += strlen(PARITY_INDICATOR) + 1; // +1 for the null character.
+
+
+		// Nonce
+		uint8_t nonce[KEY_SIZE];
+		if(sgx_read_rand(nonce, KEY_SIZE) != SGX_SUCCESS) {
+			// Handle Error
+		}
+		memcpy(parityData[0] + loc, nonce, KEY_SIZE);
+		loc += KEY_SIZE;
+
+
+		// Signature
+		uint8_t groupKey[KEY_SIZE];
+		uint8_t signature[KEY_SIZE];
+		hmac_sha1(sharedKey, KEY_SIZE, nonce, KEY_SIZE, groupKey, KEY_SIZE);
+		hmac_sha1(groupKey, KEY_SIZE, PARITY_INDICATOR, strlen(PARITY_INDICATOR), signature, KEY_SIZE);
+		memcpy(parityData[0] + loc, signature, KEY_SIZE);
+
+		// Number of pages
+		int numPages = numParityBlocks * PAGE_PER_BLOCK;
+		memcpy(parityData[0] + loc, (uint8_t *) &numPages,sizeof(int));
+		loc += sizeof(int);
+
+		// Proof
+		// Generate l * log(PAGE_SIZE/l) bit random number for each page, using groupKey.
+		uint8_t secretMessage[(SECRET_LENGTH / 8) * numPages];
+		
+		prng_init((uint32_t*) &groupKey);
+
+		for(int i = 0; i < numPages; i++) {
+			int randLen = SECRET_LENGTH * log2((PAGE_SIZE * 8) / SECRET_LENGTH);
+			uint8_t pageRands[SECRET_LENGTH];
+
+			int current = 0;
+			for(int j = 0; j < SECRET_LENGTH; j++) {
+				pageRands[j] = prng_next();
+
+				int pageIndex = (current + pageRands[j]) / 8;
+        		int bitIndex = (current + pageRands[j]) % 8;
+				// add the (current + pageRands[j])th bit in current page to secret_Message, from parityData.
+				secretMessage[i * (SECRET_LENGTH / 8) + j / 8] |= ((parityData[floor(i / PAGE_PER_BLOCK)][pageIndex + ((i % (PAGE_PER_BLOCK)) * PAGE_SIZE)] >> bitIndex) & 1) << (j % 8);
+
+				current += (PAGE_SIZE * 8)/SECRET_LENGTH;
+			}
 		}
 
-		// TODO: protect this write with an encrypted passcode (the key needs to change each time) that the FTL can verify.
-		// Note: this should be based on a shared counter in some way (start at a nonce value and increment).
-		// Also, this may require some refactorization, as this cannot be done in untrusted app.
-		// Will need to write each page individually. The key needs to be included in the write,
-		// so the size needs to be accounted for, make sure though, that FTL stores the data as expected. (with each block ending in a MAC)
+		memcpy(parityData[0] + loc, secretMessage, (SECRET_LENGTH / 8) * numPages);
+
+		// Now, simply write parityData to FTL. NOTE: no special OCALL required... note, we ARE doing this on a group by group basis.
+		// There is also a lot of room for refactorization in this code
+
 		ocall_write_parity((uint16_t *) symbolData + numDataSymbols, numParityBlocks, startPage);
 
 		startPage += numParityBlocks * PAGE_PER_BLOCK;
@@ -484,8 +532,6 @@ void generate_file_parity(int fileNum)
     }
     ocall_init_parity(numBits);
 }
-
-
 
 
 
@@ -558,6 +604,7 @@ void ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBloc
         }
     }
 	files[i].numBlocks = numBlocks;
+	files[i].numGroups = 2; // TODO: Come up with some function to determine this value for a given file. For now, it is hardcoded.
 
 	// Generate prime number asssotiated with the file
     prime = BN_new();
@@ -583,7 +630,7 @@ void ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBloc
     }
 
 	// Generate PDP alpha tags.
-    gen_file_tag(prime, tag);
+    gen_filnum_e_tag(prime, tag);
 
     blockNum = 0;
 
@@ -738,7 +785,10 @@ void ecall_audit_file(const char *fileName, int *ret)
 	
 	// Call gen_challenge to get {i, Vi}
 	uint8_t indices[NUM_CHAL_BLOCKS];
-	uint8_t *coefficients = malloc(sizeof(uint8_t) * ((PRIME_LENGTH / 8) * NUM_CHAL_BLOCKS));
+	uint8_t *coeffi	uint8_t challNum[KEY_SIZE];
+	if(sgx_read_rand(challNum, KEY_SIZE) != SGX_SUCCESS) {
+		// Handle Error
+	}cients = malloc(sizeof(uint8_t) * ((PRIME_LENGTH / 8) * NUM_CHAL_BLOCKS));
 	gen_challenge(files[i].numBlocks, indices, coefficients, files[i].prime); // MAYBE?? reduce coeff mod p
 
 	// JD test 
