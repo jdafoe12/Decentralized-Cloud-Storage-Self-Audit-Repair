@@ -425,68 +425,56 @@ void state_2(int server_fd)
 
 }
 
-void write_parity(int server_fd) 
+void write_page(int server_fd) 
 {
 
     int client_fd;
-    uint8_t buffer[8192];
+    uint8_t buffer[4096]; // TODO: define constants, probably in different file. (This is PAGE_SIZE)
     
 
 
     // Open storage device. ASSUME 1 File for now
     int fd; 
-    if((fd = open(PATH, O_RDWR)) == -1) { // For now do not do O_DIRECT. This is not in reserved area. A simple write
-        perror("[open]");
+    if((fd = open(PATH, O_RDWR)) == -1) { 
+		perror("[open]");
         return;
     }
 
-
-
-    int startPage = 0;
-    // Receive file name
+    // Receive address
+    int address = 0;
     client_fd = accept_connection(server_fd);
-    int fileNameLen = read(client_fd, startPage, sizeof(startPage));
+    read(client_fd, address, sizeof(address));
     close(client_fd);
 
-    // Receive number of blocks
-    int numParityBlocks;
 
-    client_fd = accept_connection(server_fd);
-    read(client_fd, &numParityBlocks, sizeof(numParityBlocks));
-    close(client_fd);
-
-    lseek(fd, 230000 + (startPage), SEEK_SET);
-
-    // Receive each block
-    uint8_t blockData[BLOCK_SIZE];
-    for (int i = 0; i < numParityBlocks; i++) {
-
-	    client_fd = accept_connection(server_fd);
-        int bytes_received = 0;
-	    int bytes_left = BLOCK_SIZE;
-	    while (bytes_left > 0) {
-    	    int bytes_read = read(client_fd, blockData + (bytes_received / 2) , bytes_left);
-    	    if (bytes_read < 0) {
-        	// handle error
-    	    } else if (bytes_read == 0) {
-                // handle disconnection
-            } else {
-                bytes_received += bytes_read;
-                bytes_left -= bytes_read;
-            }
+    lseek(fd, address, SEEK_SET); // TODO: figure out, concretely, the granularity of the writes/addresses.
+								  // Can I write an entire page with one write (in the FTL)...assume this for now.
+								  // Make sure, in the code, that this is consistant between FTL, client side, and server.
+	// Recieve page into buffer
+	client_fd = accept_connection(server_fd); // TODO: it is best to just write a function in scom.c that recieves
+											  // arbitrary amount of data.
+    int bytes_received = 0;
+	int bytes_left = 4096;
+	while (bytes_left > 0) {
+    	int bytes_read = read(client_fd, blockData + bytes_received, bytes_left);
+    	if (bytes_read < 0) {
+        	// handle errors
+    	} else if (bytes_read == 0) {
+            // handle disconnection
+        } else {
+            bytes_received += bytes_read;
+            bytes_left -= bytes_read;
         }
-     //   printf("Block %d received successfully\n", i);
-
-	    close(client_fd);
-    
-        // Write block to storage device
-	    if(write(fd, blockData, BLOCK_SIZE) == -1) {
-	        perror("[write]");
-	        close(fd);
-	        return;
-	    }
     }
+	close(client_fd);
 
+
+    // Write page to storage device
+	if(write(fd, buffer, 4096) == -1) {
+	    perror("[write]");
+	    close(fd);
+	    return;
+	}
 }
 
 main() 
@@ -519,15 +507,16 @@ main()
             printf("get nonce\n");
             get_challnum(server_fd);
         }
-        else if(strcmp(command, "write_parity") == 0 ) {
-            printf("write parity\n");
-            write_parity(server_fd);
+        else if(strcmp(command, "write_page") == 0 ) {
+            printf("write page\n");
+            write_page(server_fd);
 
         }
-	else if(strcmp(command, "state_2") == 0) {
-	    printf("enter state 2\n");
-	    state_2(server_fd);
-	}
+		else if(strcmp(command, "state_2") == 0) { // TODO: should be changed to writing a signed magic number.
+												   // State transitions need to be better defined in FTL, in general.
+	    	printf("enter state 2\n");
+	   		state_2(server_fd);
+		}
         else exit(1);
     }
 }
