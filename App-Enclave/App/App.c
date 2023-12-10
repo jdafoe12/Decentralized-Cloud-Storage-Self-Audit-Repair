@@ -23,7 +23,8 @@
 void ocall_write_page(int address, uint8_t *page);
 {
     send_data_to_server("write_page", 11);
-    sennd_data_to_server(page, sizeof(uint8_t * PAGE_SIZE));
+	send_data_to_server(address, sizeof(int));
+    send_data_to_server(page, sizeof(uint8_t * PAGE_SIZE));
 
 }
 
