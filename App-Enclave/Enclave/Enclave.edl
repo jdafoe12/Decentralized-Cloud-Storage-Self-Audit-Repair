@@ -9,7 +9,7 @@ enclave {
 	trusted {
 
 		public void ecall_init();
-		public void ecall_file_init([in, string] const char *fileName,[out] Tag *tag,[out, size=10, count=10] uint8_t *sigma, int numBlocks);
+		public int ecall_file_init([in, string] const char *fileName,[out] Tag *tag,[out, size=10, count=10] uint8_t *sigma, int numBlocks);
 		public void ecall_audit_file([in, string] const char *fileName,[out] int *ret);
 	};
 
@@ -29,7 +29,7 @@ enclave {
 
 		void ocall_init_parity(int numBits);
 
-		void ocall_write_parity([in, count=blocksInGroup, size=4096] uint16_t *data, int blocksInGroup, int groupNum);
+		void ocall_write_page([in, size=PAGE_SIZE] uint8_t *page);
 
 	};
 };

@@ -18,9 +18,11 @@
 #define MAX_FILES 10
 
 #define NUM_CHAL_BLOCKS 5
-#define NUM_GROUPS 2 // Erasure code parameters. Maybe should be part of File struct
-#define NUM_TOTAL_SEGMENTS 3
+#define NUM_ORIGINAL_SYMBOLS 2 // Erasure code parameters. Maybe should be part of File struct
+#define NUM_TOTAL_SYMBOLS 3
 
+#define SECRET_LENGTH ((PAGE_SIZE * 8) / 256) // One bit in secret message every 512 bits.
+#define PARITY_START 100000 // Start address for parity data.
 
 typedef struct Tag {
     int n;

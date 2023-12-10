@@ -20,54 +20,10 @@
 
 #include <string.h>
 
-
-
-
-void ocall_write_parity(uint16_t *data, int numParityBlocks, int  startPage) 
+void ocall_write_page(int address, uint8_t *page);
 {
-
-	int client_fd;
-
-	client_fd = create_client_socket();
-    connect_to_server(client_fd);
-	write(client_fd, "write_parity", 12);
-	close(client_fd);
-
-	client_fd = create_client_socket();
-	connect_to_server(client_fd);
-    write(client_fd, &startPage, sizeof(startPage)); /* startPage */
-	close(client_fd);
-
-
-	client_fd = create_client_socket();
-	connect_to_server(client_fd);
-    write(client_fd, &numParityBlocks, sizeof(numParityBlocks)); /* Send number of parity blocks */
-	close(client_fd);
-
-    /* Send each block data to the server */
-    for (int i = 0; i < numParityBlocks; i++) {
-        /* Read the i-th block from the file into blockData */
-
-        /* Send the i-th block to the server */
-		client_fd = create_client_socket();
-		connect_to_server(client_fd);
-
-		int bytes_sent = 0;
-		int bytes_left = BLOCK_SIZE;
-		while (bytes_left > 0) {
-    		int bytes_written = write(client_fd, data + (bytes_sent / 2), bytes_left);
-    		if (bytes_written < 0) {
-        		perror("Error sending data");
-        		close(client_fd);
-        		exit(1);
-    		}
-    		bytes_sent += bytes_written;
-    		bytes_left -= bytes_written;
-		}
-		close(client_fd);
-	//	printf("Sent block %d\n", i);
-    }
-
+    send_data_to_server("write_page", 11);
+    sennd_data_to_server(page, sizeof(uint8_t * PAGE_SIZE));
 
 }
 
@@ -263,7 +219,8 @@ void app_file_init(sgx_enclave_id_t eid, const char *fileName,  int numBlocks)
     /* Call ecall_file_init to initialize tag and sigma */
 
 	//printf("call ecall\n");
-    status = ecall_file_init(eid, fileName, tag, *sigma, numBlocks);
+
+    int fileNum = ecall_file_init(eid, fileName, tag, *sigma, numBlocks, fileNum); // make sure the change to returning fileNum works properly.
     if (status != SGX_SUCCESS) {
         printf("Error calling enclave function: %d\n", status);
         return;
@@ -357,6 +314,8 @@ void app_file_init(sgx_enclave_id_t eid, const char *fileName,  int numBlocks)
 
     fclose(file);
 	/* server function file_init has now completed execution, it does not require any more data */
+    ecall_generate_file_parity(fileNum); // Note: The convention for this call is slightly different than the rest of the file initialization.
+                                         // Above, the gennerated data is directly retrurned, rather than written via an ocall, as is done here.
 }
 
 

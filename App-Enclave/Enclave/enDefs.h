@@ -22,7 +22,7 @@ typedef struct File {
 	int k;
 	char fileName[FILE_NAME_LEN];
 	uint8_t prime[PRIME_LENGTH / 8];
-	uint8_t sortKey[KEY_SIZE];
+	uint8_t sortKey[KEY_SIZE]; // I never define this. I should randomly generate it in file_init.
 } File;
 
 extern File files[MAX_FILES];

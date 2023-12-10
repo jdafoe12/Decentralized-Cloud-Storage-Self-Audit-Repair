@@ -267,7 +267,7 @@ int audit_block_group(int fileNum, int numBlocks, int *blockNums, BIGNUM **sigma
  *
  */
 
-void generate_file_parity(int fileNum) 
+void ecall_generate_file_parity(int fileNum) 
 {
     /* 
      * porSK.sortKey is the PRP key to get the group. Need different keys for each file??
@@ -293,7 +293,7 @@ void generate_file_parity(int fileNum)
     // Generate groups array.
     int numBlocks = files[fileNum].numBlocks;
     int numPages = numBlocks * PAGE_PER_BLOCK;
-	int numGroups = files[fileNum].numGroups; // TODO: base this off data in file struct.
+	int numGroups = files[fileNum].numGroups;
     int numBits = (int)ceil(log2(numPages));
 
     uint64_t **groups = get_groups(files[fileNum].sortKey, numBlocks, numGroups);
@@ -308,7 +308,7 @@ void generate_file_parity(int fileNum)
 	uint8_t segData[SEGMENT_SIZE];
     uint8_t groupData[maxBlocksPerGroup * SEGMENT_PER_BLOCK * SEGMENT_SIZE];
 
-	int startPage = 0; // TODO: This should start at start of parity for file. This can be calculated based on defined values and data in files struct.
+	int startPage = 0; // TODO: This should start at start of parity for file in FTL. This can be calculated based on defined values and data in files struct.
     for (int group = 0; group < numGroups; group++) {
 
         blocksInGroup = 0;
@@ -362,7 +362,7 @@ void generate_file_parity(int fileNum)
 		// Get sigmas and file tag.
 		const int totalSegments = (files[fileNum].numBlocks * SEGMENT_PER_BLOCK);
 	    int sigPerSeg = floor((double)SEGMENT_SIZE / ((double)PRIME_LENGTH / 8));
-	    int tagSegNum = totalSegments + ceil((double)files[i].numBlocks /(double) sigPerSeg);
+	    int tagSegNum = totalSegments + ceil((double)files[fileNum].numBlocks /(double) sigPerSeg);
 		int tagPageNum = floor(tagSegNum / SEGMENT_PER_PAGE);
 		// Permute tagPageNum
 		permutedPageNum = feistel_network_prp(sharedKey, pageNum, numBits);
@@ -400,7 +400,7 @@ void generate_file_parity(int fileNum)
 
 		if(audit_block_group(fileNum, blocksInGroup, groups[group], sigmas, tag, groupData) != 0) {
 			// Invalid data. Handle error.
-			ocall_printf("AUDIT FAILED!!", 15, 0)
+			ocall_printf("AUDIT FAILED!!", 15, 0);
 		}
 
 		// Setup RS parameters
@@ -433,10 +433,6 @@ void generate_file_parity(int fileNum)
     	encode_rs_int(rs, symbolData, symbolData + numDataSymbols);
 		// TODO: just test that all the right data are in the right places in the end
 		// TODO: verify this works, add authentication, and refine the locations on this!
-		
-		// TODO: encrypt parity before sending it. FTL will store it encrypted.
-		// TODO: This data needs to be sent in such a way that the FTL knows 
-		// it all came from the SGX... To do this, I will additionally send the parity with a MAC.
 
 		// Place all parity data in tempParityData.
 		uint8_t* tempParityData = (uint8_t*)malloc(numParitySymbols * bytesPerSymbol);
@@ -447,7 +443,7 @@ void generate_file_parity(int fileNum)
 		}
 
 		uint8_t parityData[numParityBlocks + 1][BLOCK_SIZE]; /* The 0th segment of the 0th block contains the following:
-															  * Replay resistant signed magic number (to go back to regular write mode)
+															  * Replay resistant signed magic number (To let FTL know what to do)
 															  * Number of pages of parity data, 
 															  * Nonce for PRF input.
 															  * Proof of data source (extracted secret message).
@@ -466,7 +462,7 @@ void generate_file_parity(int fileNum)
 
 		// Prepare parityData[0][0:SEGMENT_SIZE]
 		int loc = 0;
-		// Magic number || Nonce || signature || numPages || Proof
+		// Magic number || Nonce || numPages || Proof || Signature
 
 		// Magic number
 		strcpy(parityData[0], PARITY_INDICATOR);
@@ -482,12 +478,9 @@ void generate_file_parity(int fileNum)
 		loc += KEY_SIZE;
 
 
-		// Signature
+		// Generate groupKey
 		uint8_t groupKey[KEY_SIZE];
-		uint8_t signature[KEY_SIZE];
 		hmac_sha1(sharedKey, KEY_SIZE, nonce, KEY_SIZE, groupKey, KEY_SIZE);
-		hmac_sha1(groupKey, KEY_SIZE, PARITY_INDICATOR, strlen(PARITY_INDICATOR), signature, KEY_SIZE);
-		memcpy(parityData[0] + loc, signature, KEY_SIZE);
 
 		// Number of pages
 		int numPages = numParityBlocks * PAGE_PER_BLOCK;
@@ -518,12 +511,22 @@ void generate_file_parity(int fileNum)
 		}
 
 		memcpy(parityData[0] + loc, secretMessage, (SECRET_LENGTH / 8) * numPages);
+		loc += (SECRET_LENGTH / 8) * numPages;
+
+		// Signature
+		uint8_t signature[KEY_SIZE];
+		hmac_sha1(groupKey, KEY_SIZE, parityData[0], loc, signature, KEY_SIZE);
+		memcpy(parityData[0] + loc, signature, KEY_SIZE);
+		loc += KEY_SIZE;
+
+
 
 		// Now, simply write parityData to FTL. NOTE: no special OCALL required... note, we ARE doing this on a group by group basis.
 		// There is also a lot of room for refactorization in this code
 
-		ocall_write_parity((uint16_t *) symbolData + numDataSymbols, numParityBlocks, startPage);
-
+		for(int i = 0; i < (numParityBlocks + 1) i++) {
+			ocall_write_page(PARIITY_START + startPage, parityData[i]);
+		}
 		startPage += numParityBlocks * PAGE_PER_BLOCK;
 
 		free_rs_int(rs);
@@ -586,7 +589,7 @@ void ecall_init()
 
 
 // Initialize the file with PoR Tags
-void ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBlocks) 
+void ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBlocks, int fileNum) 
 {
 
     int i, j;
@@ -606,10 +609,12 @@ void ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBloc
 	files[i].numBlocks = numBlocks;
 	files[i].numGroups = 2; // TODO: Come up with some function to determine this value for a given file. For now, it is hardcoded.
 
-	// Generate prime number asssotiated with the file
+
+	// Generate prime number and key asssotiated with the file
     prime = BN_new();
 	BN_zero(prime);
     BN_generate_prime_ex(prime, PRIME_LENGTH, 0, NULL, NULL, NULL);
+	sgx_read_rand(files[i].sortKey, KEY_SIZE);
 
 	// JD test
 	#ifdef TEST_MODE
@@ -712,7 +717,7 @@ void ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBloc
     // Encrypt alpha with encKey and perform MAC
     prepare_tag(tag, porSK);
 
-	generate_file_parity(i); //TODO
+	generate_file_parity(i);
 
     return;
 }
