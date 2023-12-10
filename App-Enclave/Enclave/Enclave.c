@@ -605,7 +605,7 @@ void ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBloc
 			files[i].inUse = 1;
             break;
         }
-    }
+    } // TODO: rename i to fileNum
 	files[i].numBlocks = numBlocks;
 	files[i].numGroups = 2; // TODO: Come up with some function to determine this value for a given file. For now, it is hardcoded.
 
@@ -719,7 +719,7 @@ void ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBloc
 
 	generate_file_parity(i);
 
-    return;
+    return i;
 }
 
 
