@@ -73,10 +73,55 @@ static int numBits = 0;  // Number of bits IO for the inverse PRP.
 static int genPar = 0;   // Boolean value. Keeps track of whether FTL is in parity generation mode.
                           // 0: Regular mode
                           // 1: Parity generation mode.
+static int restricted_area_end = 5000; // TODO: should this be -1??
+static int expected_semiRestricted_writes = 0;
+static int current_semiRestricted_writes = 0;
+static int secretLen = 0;
+static int proofLen = 0;
+static uint8_t *proof = malloc(1); 
 //int read_loops;
 // end Jdafoe
 
 // Jdafoe
+
+
+/* pseudo random number generator with 128 bit internal state... probably not suited for cryptographical usage */
+typedef struct
+{
+  uint32_t a;
+  uint32_t b;
+  uint32_t c;
+  uint32_t d;
+} prng_t;
+
+static prng_t prng_ctx;
+
+static uint32_t prng_rotate(uint32_t x, uint32_t k)
+{
+  return (x << k) | (x >> (32 - k)); 
+}
+
+static uint32_t prng_next(void)
+{
+  uint32_t e = prng_ctx.a - prng_rotate(prng_ctx.b, 27); 
+  prng_ctx.a = prng_ctx.b ^ prng_rotate(prng_ctx.c, 17); 
+  prng_ctx.b = prng_ctx.c + prng_ctx.d;
+  prng_ctx.c = prng_ctx.d + e; 
+  prng_ctx.d = e + prng_ctx.a;
+  return prng_ctx.d;
+}
+
+static void prng_init(uint32_t seed)
+{
+  uint32_t i;
+  prng_ctx.a = 0xf1ea5eed;
+  prng_ctx.b = prng_ctx.c = prng_ctx.d = seed;
+
+  for (i = 0; i < 31; ++i) 
+  {
+    (void) prng_next();
+  }
+}
 
 // Niusen
 // Function to encrypt read data
@@ -239,7 +284,7 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
   // Jdafoe
   
   /*
-   * 237846 (951384) - 
+   * 237846 (951384) - Explicit mode change.. TODO
    * 237847 (951388) - Generate shared key via Diffie-Hellman key exchange.
    * 237848 (951392) - Generate temporary key from shared key, derived from nonce.
    * 237849 (951396) - Recieve page next page number to be read for current audit.
@@ -310,7 +355,7 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
   }
   
   // Writes to 237849 (951396) will be te index for next page to be read during audit
-  if(addr == 237849) {
+  if(addr == 237849) { // TODO: this can probably be handled better for efficiency.
     uint8_t *temp = buffer;
     //uart_printf("Recieving index: ");
     //for(int i = 0; i < 1; i++) {
@@ -340,6 +385,117 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
     else {
       genPar = 0;
     }
+  }
+
+  if(addr >= 5000 && addr < restricted_area_end) { // TODO: these "ends" should be defined as constants
+  	// writes are simply disabled here.
+	return;
+	
+  }
+  if(addr >= restricted_area_end && addr <= 10000) {
+	  // very first is to check magic number. if it is "PARITY", then set expected_semiRestricted_writes and current_semiRestricted_writes to 0.
+	  uint8_t *temp = buffer;
+	  int loc = 0;
+
+	  char magicNumber[7] = {0};
+	  for(int i = 0; i < 6; i++) {
+		magicNumber[i] = temp[i];
+	  }
+	  if(strcmp("PARITY", magicNumber) == 0) {
+		loc += 7;
+		// generate groupKey... this _should_ be the only tempKey?
+		hmac_sha1(dh_sharedKey, KEY_SIZE, temp + loc, KEY_SIZE, tempKey, KEY_SIZE);
+		loc += KEY_SIZE;
+
+		// get expected_semiRestricted_writes
+		expected_semiRestricted_writes = (int) temp + (7 + KEY_SIZE);
+
+		// get Proof length and secret length
+		
+		proofLen = (int) temp + (loc + sizeof(int));
+		loc += sizeof(int);
+		secretLen = (proofLen / expected_semiRestricted_writes) * 8;
+
+
+		// get proof
+		
+		free(proof);
+		proof = malloc(proofLen);
+
+		memcpy(proof, temp + loc, proofLen);
+		loc += proofLen;
+
+		// validate signature
+		uint8_t signature[KEY_SIZE];
+		hmac_sha1(tempKey, KEY_SIZE, temp, loc, signature, KEY_SIZE);
+		if(memcmp(signature, temp + loc, KEY_SIZE) != 0) {
+			// Handle error. signature failed.
+			current_semiRestricted_writes = 0;
+			expected_semiRestricted_writes = 0;
+		}
+		if() // other fail conditions
+		prng_init((uint32_t*) &tempKey);
+	  }
+	  else if(expected_semiRestricted_writes > current_semiRestricted_writes) {
+		// progressively check proof.
+		if(restricted_area_end + current_semiRestricted_writes + 1 != addr) {
+			expected_semiRestricted_writes = 0;
+			current_semiRestricted_writes = 0;
+			break; // TODO: think if this is really all that needs to be done on fail. There is an implicit failsafe... no comm with TEE here.
+		}
+
+
+		
+		int randLen = secretLen * log2((4096 * 8) / secretLen);
+		uint8_t pageRand[secretLen];
+
+		int current = 0;
+		int verificationResult = 1;
+		for(int j = 0; j < secretLen; j++) {
+			pageRand[j] = prng_next();
+			int pageIndex = (current + pageRand[j]) / 8;
+			int bitIndex = (current + pageRands[j]) % 8;
+
+			int proofBit = (current_semiRestricted_writes * secretLen) + j;
+			int proofByteIndex = proofBit / 8;
+			int proofBitIndex = proofBit % 8;
+
+			if(((temp[pageIndex] >> (8 - bitIndex)) & 1) != ((proof[proofByteIndex] >> (8 - proofBitIndex)) & 1)) {
+				// proof failed... reset expected_semiRestricted_writes and current_semiRestricted_writes, etc... other important things (so that further writes are rejected). AND, write signed 0 to location for Enclave to read.
+				expected_semiRestricted_writes = 0;
+				current_semiRestricted_writes = 0;
+				verificationResult = 0;
+				uint8_t signedVerificationResult[KEY_SIZE + 1];
+				hmac_sha1(tempKey, KEY_SIZE, signedVerificationResult, sizeof(int), signedVerificationResult + 1, KEY_SIZE);
+				signedVerificationResult[0] = verificationResult;
+				FTL_Write(1000, signedVerificationResult);
+				break;
+			}
+		}
+		current_semiRestricted_writes++;
+		if(verificationResult == 1) {
+			if(current_semiRestricted_writes == expected_semiRestricted_writes) {
+				// proof success. Write signed 1 to location for Enclave to read. Reset essential viriables.
+				uint8_t signedVerificationResult[KEY_SIZE + 1];
+				restricted_area_end += expected_semiRestricted_writes;
+				expected_semiRestricted_writes = 0;
+				current_semiRestricted_writes = 0;
+				hmac_sha1(tempKey, KEY_SIZE, signedVerificationResult, sizeof(int), signedVerificationResult + 1, KEY_SIZE);
+				signedVerificationResult[0] = verificationResult;
+				FTL_Write(1000, signedVerificationResult);
+			}
+		}
+
+	  }
+
+	  // Note: there are a few conditions which comprimize this process explicily:
+	  // signature fails
+	  // expected_semiRestricted_writes == 0 && addr != restricted_area_end.
+	  // restricted_area_end + current_semiRestricted_writes + 1 != addr 
+	  
+
+	  // If not first semi-restricted write, then progressively check proof.
+	  // If final semi-restricted write, then increase restricted_area_end only if proof passed, and regardless, write signed proof verification results to a certain address, which should be read by the Enclave.
   }
   
   // end Jdafoe

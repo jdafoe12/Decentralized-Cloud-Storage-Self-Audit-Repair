@@ -462,12 +462,12 @@ void ecall_generate_file_parity(int fileNum)
 
 		// Prepare parityData[0][0:SEGMENT_SIZE]
 		int loc = 0;
-		// Magic number || Nonce || numPages || Proof || Signature
+		// Magic Number || Nonce || numPages || Proof length || Proof || Signature
+		
 
-		// Magic number
-		strcpy(parityData[0], PARITY_INDICATOR);
+		// Magic Number
+		strcpy(parityData[0],PARITY_INDICATOR);
 		loc += strlen(PARITY_INDICATOR) + 1; // +1 for the null character.
-
 
 		// Nonce
 		uint8_t nonce[KEY_SIZE];
@@ -486,7 +486,10 @@ void ecall_generate_file_parity(int fileNum)
 		int numPages = numParityBlocks * PAGE_PER_BLOCK;
 		memcpy(parityData[0] + loc, (uint8_t *) &numPages,sizeof(int));
 		loc += sizeof(int);
-
+		// Proof length
+		int proofLength = (SECRET_LENGTH / 8) * numPages;
+		memcpy(parityData[0] + loc, (uint8_t *) &proofLength, sizeof(int));
+		loc += sizeof(int);
 		// Proof
 		// Generate l * log(PAGE_SIZE/l) bit random number for each page, using groupKey.
 		uint8_t secretMessage[(SECRET_LENGTH / 8) * numPages];
@@ -506,7 +509,7 @@ void ecall_generate_file_parity(int fileNum)
 				// add the (current + pageRands[j])th bit in current page to secret_Message, from parityData.
 				secretMessage[i * (SECRET_LENGTH / 8) + j / 8] |= ((parityData[floor(i / PAGE_PER_BLOCK)][pageIndex + ((i % (PAGE_PER_BLOCK)) * PAGE_SIZE)] >> bitIndex) & 1) << (j % 8);
 
-				current += (PAGE_SIZE * 8)/SECRET_LENGTH;
+				current += proofLength;
 			}
 		}
 
@@ -533,6 +536,9 @@ void ecall_generate_file_parity(int fileNum)
     	free(symbolData);
 
     }
+
+	// read from page 1000 and verify proof verification || signature (it uses groupKey).
+
     ocall_init_parity(numBits);
 }
 
