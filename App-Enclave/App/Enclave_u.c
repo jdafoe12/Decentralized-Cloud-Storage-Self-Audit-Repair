@@ -2,6 +2,7 @@
 #include <errno.h>
 
 typedef struct ms_ecall_file_init_t {
+	int ms_retval;
 	const char* ms_fileName;
 	size_t ms_fileName_len;
 	Tag* ms_tag;
@@ -15,6 +16,10 @@ typedef struct ms_ecall_audit_file_t {
 	int* ms_ret;
 } ms_ecall_audit_file_t;
 
+typedef struct ms_ecall_generate_file_parity_t {
+	int ms_fileNum;
+} ms_ecall_generate_file_parity_t;
+
 typedef struct ms_ocall_ftl_init_t {
 	uint8_t* ms_sgx_pubKey;
 	uint8_t* ms_ftl_pubKey;
@@ -22,8 +27,8 @@ typedef struct ms_ocall_ftl_init_t {
 
 typedef struct ms_ocall_get_block_t {
 	uint8_t* ms_data;
-	size_t ms_pageSize;
-	int ms_pagePerBlock;
+	size_t ms_segSize;
+	int ms_segPerBlock;
 	int ms_blockNum;
 	char* ms_fileName;
 } ms_ocall_get_block_t;
@@ -38,21 +43,20 @@ typedef struct ms_ocall_send_nonce_t {
 	uint8_t* ms_nonce;
 } ms_ocall_send_nonce_t;
 
-typedef struct ms_ocall_get_page_t {
+typedef struct ms_ocall_get_segment_t {
 	const char* ms_fileName;
-	int ms_pageNum;
-	uint8_t* ms_pageData;
-} ms_ocall_get_page_t;
+	int ms_segNum;
+	uint8_t* ms_segData;
+} ms_ocall_get_segment_t;
 
 typedef struct ms_ocall_init_parity_t {
 	int ms_numBits;
 } ms_ocall_init_parity_t;
 
-typedef struct ms_ocall_write_parity_t {
-	uint16_t* ms_data;
-	int ms_blocksInGroup;
-	int ms_groupNum;
-} ms_ocall_write_parity_t;
+typedef struct ms_ocall_write_page_t {
+	int ms_address;
+	uint8_t* ms_page;
+} ms_ocall_write_page_t;
 
 typedef struct ms_sgx_oc_cpuidex_t {
 	int* ms_cpuinfo;
@@ -109,7 +113,7 @@ static sgx_status_t SGX_CDECL Enclave_ocall_ftl_init(void* pms)
 static sgx_status_t SGX_CDECL Enclave_ocall_get_block(void* pms)
 {
 	ms_ocall_get_block_t* ms = SGX_CAST(ms_ocall_get_block_t*, pms);
-	ocall_get_block(ms->ms_data, ms->ms_pageSize, ms->ms_pagePerBlock, ms->ms_blockNum, ms->ms_fileName);
+	ocall_get_block(ms->ms_data, ms->ms_segSize, ms->ms_segPerBlock, ms->ms_blockNum, ms->ms_fileName);
 
 	return SGX_SUCCESS;
 }
@@ -130,10 +134,10 @@ static sgx_status_t SGX_CDECL Enclave_ocall_send_nonce(void* pms)
 	return SGX_SUCCESS;
 }
 
-static sgx_status_t SGX_CDECL Enclave_ocall_get_page(void* pms)
+static sgx_status_t SGX_CDECL Enclave_ocall_get_segment(void* pms)
 {
-	ms_ocall_get_page_t* ms = SGX_CAST(ms_ocall_get_page_t*, pms);
-	ocall_get_page(ms->ms_fileName, ms->ms_pageNum, ms->ms_pageData);
+	ms_ocall_get_segment_t* ms = SGX_CAST(ms_ocall_get_segment_t*, pms);
+	ocall_get_segment(ms->ms_fileName, ms->ms_segNum, ms->ms_segData);
 
 	return SGX_SUCCESS;
 }
@@ -146,10 +150,10 @@ static sgx_status_t SGX_CDECL Enclave_ocall_init_parity(void* pms)
 	return SGX_SUCCESS;
 }
 
-static sgx_status_t SGX_CDECL Enclave_ocall_write_parity(void* pms)
+static sgx_status_t SGX_CDECL Enclave_ocall_write_page(void* pms)
 {
-	ms_ocall_write_parity_t* ms = SGX_CAST(ms_ocall_write_parity_t*, pms);
-	ocall_write_parity(ms->ms_data, ms->ms_blocksInGroup, ms->ms_groupNum);
+	ms_ocall_write_page_t* ms = SGX_CAST(ms_ocall_write_page_t*, pms);
+	ocall_write_page(ms->ms_address, ms->ms_page);
 
 	return SGX_SUCCESS;
 }
@@ -228,9 +232,9 @@ static const struct {
 		(void*)Enclave_ocall_get_block,
 		(void*)Enclave_ocall_printf,
 		(void*)Enclave_ocall_send_nonce,
-		(void*)Enclave_ocall_get_page,
+		(void*)Enclave_ocall_get_segment,
 		(void*)Enclave_ocall_init_parity,
-		(void*)Enclave_ocall_write_parity,
+		(void*)Enclave_ocall_write_page,
 		(void*)Enclave_sgx_oc_cpuidex,
 		(void*)Enclave_sgx_thread_wait_untrusted_event_ocall,
 		(void*)Enclave_sgx_thread_set_untrusted_event_ocall,
@@ -248,7 +252,7 @@ sgx_status_t ecall_init(sgx_enclave_id_t eid)
 	return status;
 }
 
-sgx_status_t ecall_file_init(sgx_enclave_id_t eid, const char* fileName, Tag* tag, uint8_t* sigma, int numBlocks)
+sgx_status_t ecall_file_init(sgx_enclave_id_t eid, int* retval, const char* fileName, Tag* tag, uint8_t* sigma, int numBlocks)
 {
 	sgx_status_t status;
 	ms_ecall_file_init_t ms;
@@ -258,6 +262,7 @@ sgx_status_t ecall_file_init(sgx_enclave_id_t eid, const char* fileName, Tag* ta
 	ms.ms_sigma = sigma;
 	ms.ms_numBlocks = numBlocks;
 	status = sgx_ecall(eid, 1, &ocall_table_Enclave, &ms);
+	if (status == SGX_SUCCESS && retval) *retval = ms.ms_retval;
 	return status;
 }
 
@@ -269,6 +274,15 @@ sgx_status_t ecall_audit_file(sgx_enclave_id_t eid, const char* fileName, int* r
 	ms.ms_fileName_len = fileName ? strlen(fileName) + 1 : 0;
 	ms.ms_ret = ret;
 	status = sgx_ecall(eid, 2, &ocall_table_Enclave, &ms);
+	return status;
+}
+
+sgx_status_t ecall_generate_file_parity(sgx_enclave_id_t eid, int fileNum)
+{
+	sgx_status_t status;
+	ms_ecall_generate_file_parity_t ms;
+	ms.ms_fileNum = fileNum;
+	status = sgx_ecall(eid, 3, &ocall_table_Enclave, &ms);
 	return status;
 }
 

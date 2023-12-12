@@ -23,7 +23,7 @@ void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_ftl_init, (uint8_t* sgx_pubKey, uint8_t
 #endif
 #ifndef OCALL_GET_BLOCK_DEFINED__
 #define OCALL_GET_BLOCK_DEFINED__
-void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_get_block, (uint8_t* data, size_t pageSize, int pagePerBlock, int blockNum, char* fileName));
+void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_get_block, (uint8_t* data, size_t segSize, int segPerBlock, int blockNum, char* fileName));
 #endif
 #ifndef OCALL_PRINTF_DEFINED__
 #define OCALL_PRINTF_DEFINED__
@@ -33,17 +33,17 @@ void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_printf, (unsigned char* buffer, size_t 
 #define OCALL_SEND_NONCE_DEFINED__
 void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_send_nonce, (uint8_t* nonce));
 #endif
-#ifndef OCALL_GET_PAGE_DEFINED__
-#define OCALL_GET_PAGE_DEFINED__
-void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_get_page, (const char* fileName, int pageNum, uint8_t* pageData));
+#ifndef OCALL_GET_SEGMENT_DEFINED__
+#define OCALL_GET_SEGMENT_DEFINED__
+void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_get_segment, (const char* fileName, int segNum, uint8_t* segData));
 #endif
 #ifndef OCALL_INIT_PARITY_DEFINED__
 #define OCALL_INIT_PARITY_DEFINED__
 void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_init_parity, (int numBits));
 #endif
-#ifndef OCALL_WRITE_PARITY_DEFINED__
-#define OCALL_WRITE_PARITY_DEFINED__
-void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_write_parity, (uint16_t* data, int blocksInGroup, int groupNum));
+#ifndef OCALL_WRITE_PAGE_DEFINED__
+#define OCALL_WRITE_PAGE_DEFINED__
+void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_write_page, (int address, uint8_t* page));
 #endif
 #ifndef SGX_OC_CPUIDEX_DEFINED__
 #define SGX_OC_CPUIDEX_DEFINED__
@@ -79,8 +79,9 @@ int SGX_UBRIDGE(SGX_CDECL, pthread_wakeup_ocall, (unsigned long long waiter));
 #endif
 
 sgx_status_t ecall_init(sgx_enclave_id_t eid);
-sgx_status_t ecall_file_init(sgx_enclave_id_t eid, const char* fileName, Tag* tag, uint8_t* sigma, int numBlocks);
+sgx_status_t ecall_file_init(sgx_enclave_id_t eid, int* retval, const char* fileName, Tag* tag, uint8_t* sigma, int numBlocks);
 sgx_status_t ecall_audit_file(sgx_enclave_id_t eid, const char* fileName, int* ret);
+sgx_status_t ecall_generate_file_parity(sgx_enclave_id_t eid, int fileNum);
 
 #ifdef __cplusplus
 }
