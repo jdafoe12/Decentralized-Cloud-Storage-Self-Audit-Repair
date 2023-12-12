@@ -37,6 +37,8 @@
 #include <core\inc\buf.h>
 
 // jdafoe
+#include <stdlib.h>
+#include <math.h>
 #include "init.h"
 #include "ecdh.h"
 #include "aes.h"
@@ -78,7 +80,7 @@ static int expected_semiRestricted_writes = 0;
 static int current_semiRestricted_writes = 0;
 static int secretLen = 0;
 static int proofLen = 0;
-static uint8_t *proof = malloc(1); 
+static uint8_t *proof = NULL;
 //int read_loops;
 // end Jdafoe
 
@@ -339,9 +341,9 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 
   if(addr == 237848) { //951392
     // Generate tempKey - derived from nonce.
+	size_t keySize = KEY_SIZE;
     uint8_t *temp = buffer;
-    int len = KEY_SIZE;
-    hmac_sha1(dh_sharedKey, ECC_PUB_KEY_SIZE, temp, KEY_SIZE, tempKey, &len);
+    hmac_sha1(dh_sharedKey, ECC_PUB_KEY_SIZE, temp, KEY_SIZE, tempKey, &keySize);
     //uart_printf("Challenge number recieved: ");
     //for(int i = 0; i < KEY_SIZE; i++) {
       //uart_printf("%x", temp[i]);
@@ -389,10 +391,11 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 
   if(addr >= 5000 && addr < restricted_area_end) { // TODO: these "ends" should be defined as constants
   	// writes are simply disabled here.
-	return;
+	return STATUS_SUCCESS;
 	
   }
   if(addr >= restricted_area_end && addr <= 10000) {
+	  size_t keySize = KEY_SIZE;
 	  // very first is to check magic number. if it is "PARITY", then set expected_semiRestricted_writes and current_semiRestricted_writes to 0.
 	  uint8_t *temp = buffer;
 	  int loc = 0;
@@ -404,50 +407,56 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 	  if(strcmp("PARITY", magicNumber) == 0) {
 		loc += 7;
 		// generate groupKey... this _should_ be the only tempKey?
-		hmac_sha1(dh_sharedKey, KEY_SIZE, temp + loc, KEY_SIZE, tempKey, KEY_SIZE);
+		hmac_sha1(dh_sharedKey, KEY_SIZE, temp + loc, KEY_SIZE, tempKey, &keySize);
 		loc += KEY_SIZE;
 
 		// get expected_semiRestricted_writes
-		expected_semiRestricted_writes = (int) temp + (7 + KEY_SIZE);
+		expected_semiRestricted_writes = (int) *(temp + (7 + KEY_SIZE));
+		loc += sizeof(int);
 
 		// get Proof length and secret length
 		
-		proofLen = (int) temp + (loc + sizeof(int));
+		proofLen = (int) *(temp + (loc + sizeof(int)));
 		loc += sizeof(int);
 		secretLen = (proofLen / expected_semiRestricted_writes) * 8;
 
 
 		// get proof
-		
-		free(proof);
+		if(proof != NULL) {	
+			free(proof);
+		}
+
 		proof = malloc(proofLen);
+		if(proof == NULL) {
+			// Handle error
+		}
 
 		memcpy(proof, temp + loc, proofLen);
 		loc += proofLen;
 
 		// validate signature
 		uint8_t signature[KEY_SIZE];
-		hmac_sha1(tempKey, KEY_SIZE, temp, loc, signature, KEY_SIZE);
+		hmac_sha1(tempKey, KEY_SIZE, temp, loc, signature, &keySize);
 		if(memcmp(signature, temp + loc, KEY_SIZE) != 0) {
 			// Handle error. signature failed.
 			current_semiRestricted_writes = 0;
 			expected_semiRestricted_writes = 0;
 		}
-		if() // other fail conditions
-		prng_init((uint32_t*) &tempKey);
+		//if() // other fail conditions TODO: Think of any additional fail conditions.
+		prng_init((uint32_t) *tempKey);
 	  }
 	  else if(expected_semiRestricted_writes > current_semiRestricted_writes) {
 		// progressively check proof.
 		if(restricted_area_end + current_semiRestricted_writes + 1 != addr) {
 			expected_semiRestricted_writes = 0;
 			current_semiRestricted_writes = 0;
-			break; // TODO: think if this is really all that needs to be done on fail. There is an implicit failsafe... no comm with TEE here.
+			return STATUS_SUCCESS; // TODO: think if this is really all that needs to be done on fail. There is an implicit failsafe... no comm with TEE here.
 		}
 
 
 		
 		int randLen = secretLen * log2((4096 * 8) / secretLen);
-		uint8_t pageRand[secretLen];
+		uint8_t *pageRand = malloc(secretLen * sizeof(uint8_t));
 
 		int current = 0;
 		int verificationResult = 1;
@@ -466,7 +475,7 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 				current_semiRestricted_writes = 0;
 				verificationResult = 0;
 				uint8_t signedVerificationResult[KEY_SIZE + 1];
-				hmac_sha1(tempKey, KEY_SIZE, signedVerificationResult, sizeof(int), signedVerificationResult + 1, KEY_SIZE);
+				hmac_sha1(tempKey, KEY_SIZE, signedVerificationResult, sizeof(int), signedVerificationResult + 1, &keySize);
 				signedVerificationResult[0] = verificationResult;
 				FTL_Write(1000, signedVerificationResult);
 				break;
@@ -480,7 +489,7 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 				restricted_area_end += expected_semiRestricted_writes;
 				expected_semiRestricted_writes = 0;
 				current_semiRestricted_writes = 0;
-				hmac_sha1(tempKey, KEY_SIZE, signedVerificationResult, sizeof(int), signedVerificationResult + 1, KEY_SIZE);
+				hmac_sha1(tempKey, KEY_SIZE, signedVerificationResult, sizeof(int), signedVerificationResult + 1, &keySize);
 				signedVerificationResult[0] = verificationResult;
 				FTL_Write(1000, signedVerificationResult);
 			}

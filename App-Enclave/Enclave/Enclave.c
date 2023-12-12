@@ -494,7 +494,7 @@ void ecall_generate_file_parity(int fileNum)
 		// Generate l * log(PAGE_SIZE/l) bit random number for each page, using groupKey.
 		uint8_t secretMessage[(SECRET_LENGTH / 8) * numPages];
 		
-		prng_init((uint32_t*) &groupKey);
+		prng_init((uint32_t) *groupKey);
 
 		for(int i = 0; i < numPages; i++) {
 			int randLen = SECRET_LENGTH * log2((PAGE_SIZE * 8) / SECRET_LENGTH);
