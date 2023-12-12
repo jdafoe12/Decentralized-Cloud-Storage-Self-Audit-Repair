@@ -20,7 +20,7 @@
 
 #include <string.h>
 
-void ocall_write_page(int address, uint8_t *page);
+void ocall_write_page(int address, uint8_t *page)
 {
     send_data_to_server("write_page", 11);
 	send_data_to_server(address, sizeof(int));
@@ -221,7 +221,7 @@ void app_file_init(sgx_enclave_id_t eid, const char *fileName,  int numBlocks)
 
 	//printf("call ecall\n");
 
-    int fileNum = ecall_file_init(eid, fileName, tag, *sigma, numBlocks, fileNum); // make sure the change to returning fileNum works properly.
+    int fileNum = ecall_file_init(eid, fileName, tag, *sigma, numBlocks); // make sure the change to returning fileNum works properly.
     if (status != SGX_SUCCESS) {
         printf("Error calling enclave function: %d\n", status);
         return;
