@@ -463,7 +463,7 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 		for(int j = 0; j < secretLen; j++) {
 			pageRand[j] = prng_next();
 			int pageIndex = (current + pageRand[j]) / 8;
-			int bitIndex = (current + pageRands[j]) % 8;
+			int bitIndex = (current + pageRand[j]) % 8;
 
 			int proofBit = (current_semiRestricted_writes * secretLen) + j;
 			int proofByteIndex = proofBit / 8;
