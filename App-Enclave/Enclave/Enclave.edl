@@ -11,6 +11,7 @@ enclave {
 		public void ecall_init();
 		public int ecall_file_init([in, string] const char *fileName,[out] Tag *tag,[out, size=10, count=10] uint8_t *sigma, int numBlocks);
 		public void ecall_audit_file([in, string] const char *fileName,[out] int *ret);
+		public void ecall_generate_file_parity(int fileNum);
 	};
 
 	untrusted {
@@ -29,7 +30,7 @@ enclave {
 
 		void ocall_init_parity(int numBits);
 
-		void ocall_write_page([in, size=PAGE_SIZE] uint8_t *page);
+		void ocall_write_page(int address, [in, size=PAGE_SIZE] uint8_t *page);
 
 	};
 };

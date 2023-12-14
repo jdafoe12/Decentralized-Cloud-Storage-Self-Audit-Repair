@@ -149,10 +149,6 @@ PorSK por_init()
 		// handle error
 	}
 
-	if(sgx_read_rand(porSKL.sortKey, KEY_SIZE) != SGX_SUCCESS) {
-		// handle error
-	}
-
 	if(sgx_read_rand(porSKL.macKey, KEY_SIZE) != SGX_SUCCESS) {
 		// handle error
 	}
@@ -201,7 +197,7 @@ uint64_t** get_groups(const uint8_t *key, int numBlocks, int numGroups)
         groups[i] = malloc(maxBlocksPerGroup * sizeof(uint64_t));
     }
     for(int i = 0; i < numGroups; i++) {
-        for(int j = 0; j < numBlocks) {
+        for(int j = 0; j < numBlocks; j++) {
             groups[i][j] = -1;
         }
 

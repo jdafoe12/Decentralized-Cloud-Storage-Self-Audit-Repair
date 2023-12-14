@@ -173,7 +173,7 @@ void get_sigma(BIGNUM *sigma, BIGNUM **data, BIGNUM **alpha, uint8_t blockNum, u
 
 	BN_free(blockRand);
 	BN_free(result);
-	BN_free(zum);
+	BN_free(sum);
 
 	return;
 }
@@ -194,8 +194,8 @@ int audit_block_group(int fileNum, int numBlocks, int *blockNums, BIGNUM **sigma
 	for(int i = 0; i < numBlocks; i++) {
             coefficients[i] = BN_new();
             BN_rand_range(coefficients[i], bn_prime);
-			BN_mod_mul(product1, sigmas[i], coefficients[i], bprime, ctx);
-    	    BN_mod_add(sigma, sigma, product1, bprime, ctx);
+			BN_mod_mul(product1, sigmas[i], coefficients[i], bn_prime, ctx);
+    	    BN_mod_add(sigma, sigma, product1, bn_prime, ctx);
 	}
 
 	// BIGNUM sigma now contains master sigma!
@@ -215,7 +215,7 @@ int audit_block_group(int fileNum, int numBlocks, int *blockNums, BIGNUM **sigma
 
 		generate_random_mod_p(tag->prfKey, KEY_SIZE, &blockNums[i], sizeof(uint8_t), bn_prime, blockRand);
 
-		BN_mod_mul(product2, blockRand, coifficients[i], bn_prime, ctx);
+		BN_mod_mul(product2, blockRand, coefficients[i], bn_prime, ctx);
 		BN_mod_add(sum1, sum1, product2, bn_prime, ctx);
 		BN_CTX_end(ctx);
 	}
@@ -237,7 +237,7 @@ int audit_block_group(int fileNum, int numBlocks, int *blockNums, BIGNUM **sigma
 			BN_bin2bn(tag->alpha[j], PRIME_LENGTH / 8, alpha);
 
 			// get segment data as bignum
-			BN_bin2bn(segData, SEGMENT_SIZE, data + (i * BLOCK_SIZE) + (j * SEGMENT_SIZE));
+			BN_bin2bn(bsegData, SEGMENT_SIZE, data + (i * BLOCK_SIZE) + (j * SEGMENT_SIZE));
 			BN_mod(bsegData, bsegData, bn_prime, ctx);
 			BN_mod_mul(product4, bsegData, alpha, bn_prime, ctx);
 			BN_mod_add(sum, sum, product4, bn_prime, ctx);
@@ -246,7 +246,7 @@ int audit_block_group(int fileNum, int numBlocks, int *blockNums, BIGNUM **sigma
 		BN_mod_add(sum2, sum2, product3, bn_prime, ctx);
 	}
 
-	BN_mod_add(sigma2, sum1, sum2, bprime, ctx);
+	BN_mod_add(sigma2, sum1, sum2, bn_prime, ctx);
 	BN_CTX_end(ctx);
 
 	uint8_t sigs[PRIME_LENGTH / 8];
@@ -284,17 +284,19 @@ void ecall_generate_file_parity(int fileNum)
 
     // generating parity data, encrypting it and sending it to FTL.
 
-	ocall_init_parity(numBits); /* 
-							     * This Does two things:
-							     * It initiates the parity mode in the FTL,
-							     * and tells it how many bits are being used in the permutation. 
-							     */
 
     // Generate groups array.
     int numBlocks = files[fileNum].numBlocks;
     int numPages = numBlocks * PAGE_PER_BLOCK;
 	int numGroups = files[fileNum].numGroups;
     int numBits = (int)ceil(log2(numPages));
+
+	ocall_init_parity(numBits); /* 
+							     * This Does two things:
+							     * It initiates the parity mode in the FTL,
+							     * and tells it how many bits are being used in the permutation. 
+							     */
+
 
     uint64_t **groups = get_groups(files[fileNum].sortKey, numBlocks, numGroups);
 
@@ -366,7 +368,7 @@ void ecall_generate_file_parity(int fileNum)
 		int tagPageNum = floor(tagSegNum / SEGMENT_PER_PAGE);
 		// Permute tagPageNum
 		permutedPageNum = feistel_network_prp(sharedKey, pageNum, numBits);
-		tagSegNum = (permutedPageNum * SEGMENT_PER_PAGE) + (tagSegNum % tagPageNum) // note, the tag is after the file, 
+		tagSegNum = (permutedPageNum * SEGMENT_PER_PAGE) + (tagSegNum % tagPageNum); // note, the tag is after the file, 
 																					// so numBits may be wrong
 		ocall_get_segment(files[fileNum].fileName, tagSegNum, segData);
 		DecryptData((uint32_t *)sharedKey, segData, SEGMENT_SIZE); 
@@ -381,18 +383,18 @@ void ecall_generate_file_parity(int fileNum)
 
 		for(int i = 0; i < blocksInGroup; i++) {
 			sigmas[i] = BN_new();
-			BN_zero(sigma);
+			BN_zero(sigmas[i]);
 
 			int startSeg = totalSegments;
  	   		int sigSeg = floor(groups[group][i] / sigPerSeg) + startSeg;
  	   		int segIndex = groups[group][i] % sigPerSeg;
 
 			uint8_t sigData[SEGMENT_SIZE];
- 	   		ocall_get_segment(fileName, sigSeg, sigData);
+ 	   		ocall_get_segment(files[fileNum].fileName, sigSeg, sigData);
 
  	   		DecryptData((uint32_t *)sharedKey, sigData, SEGMENT_SIZE);
 
-			BN_bin2bn(sigData + (sigIndex * (PRIME_LENGTH / 8)), PRIME_LENGTH / 8, sigmas[i]);
+			BN_bin2bn(sigData + (segIndex * (PRIME_LENGTH / 8)), PRIME_LENGTH / 8, sigmas[i]);
 		}
 
 		// TODO: a lot of repeated code between audit_file and here. This is the same between audit_block_group, and audit_file.
@@ -413,7 +415,7 @@ void ecall_generate_file_parity(int fileNum)
 		int prim = 1; 
 		int nroots = (groupByteSize / 2) * ((double) ((double) NUM_TOTAL_SYMBOLS / NUM_ORIGINAL_SYMBOLS) - 1);
 		
-		int bytesPerSymbol = pow(2, (log2(symSize) - log2(sizeof(uint8_t))))
+		int bytesPerSymbol = pow(2, (log2(symSize) - log2(sizeof(uint8_t))));
 		int symbolsPerSegment = SEGMENT_SIZE / bytesPerSymbol;
         int numDataSymbols = groupByteSize / bytesPerSymbol;
         int totalSymbols = numDataSymbols + nroots;
@@ -435,7 +437,7 @@ void ecall_generate_file_parity(int fileNum)
 		// TODO: verify this works, add authentication, and refine the locations on this!
 
 		// Place all parity data in tempParityData.
-		uint8_t* tempParityData = (uint8_t*)malloc(numParitySymbols * bytesPerSymbol);
+		uint8_t* tempParityData = (uint8_t*)malloc(nroots * bytesPerSymbol);
 		for (int currentSymbol = numDataSymbols; currentSymbol < totalSymbols; currentSymbol++) {
 			for(int i = 0; i < bytesPerSymbol; i++) {
     			tempParityData[((currentSymbol * bytesPerSymbol) - (numDataSymbols * bytesPerSymbol)) + i] = (symbolData[currentSymbol] >> ((bytesPerSymbol - (i + 1)) * 8)) & 0xFF;
@@ -507,7 +509,7 @@ void ecall_generate_file_parity(int fileNum)
 				int pageIndex = (current + pageRands[j]) / 8;
         		int bitIndex = (current + pageRands[j]) % 8;
 				// add the (current + pageRands[j])th bit in current page to secret_Message, from parityData.
-				secretMessage[i * (SECRET_LENGTH / 8) + j / 8] |= ((parityData[floor(i / PAGE_PER_BLOCK)][pageIndex + ((i % (PAGE_PER_BLOCK)) * PAGE_SIZE)] >> bitIndex) & 1) << (j % 8);
+				secretMessage[i * (SECRET_LENGTH / 8) + j / 8] |= ((parityData[(int) floor((double) i / PAGE_PER_BLOCK)][pageIndex + ((i % (PAGE_PER_BLOCK)) * PAGE_SIZE)] >> bitIndex) & 1) << (j % 8);
 
 				current += proofLength;
 			}
@@ -527,8 +529,8 @@ void ecall_generate_file_parity(int fileNum)
 		// Now, simply write parityData to FTL. NOTE: no special OCALL required... note, we ARE doing this on a group by group basis.
 		// There is also a lot of room for refactorization in this code
 
-		for(int i = 0; i < (numParityBlocks + 1) i++) {
-			ocall_write_page(PARIITY_START + startPage, parityData[i]);
+		for(int i = 0; i < (numParityBlocks + 1); i++) {
+			ocall_write_page(PARITY_START + startPage, parityData[i]);
 		}
 		startPage += numParityBlocks * PAGE_PER_BLOCK;
 
@@ -595,7 +597,7 @@ void ecall_init()
 
 
 // Initialize the file with PoR Tags
-void ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBlocks, int fileNum) 
+int ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBlocks) 
 {
 
     int i, j;
@@ -641,7 +643,7 @@ void ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBloc
     }
 
 	// Generate PDP alpha tags.
-    gen_filnum_e_tag(prime, tag);
+    gen_file_tag(prime, tag);
 
     blockNum = 0;
 
@@ -723,7 +725,6 @@ void ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBloc
     // Encrypt alpha with encKey and perform MAC
     prepare_tag(tag, porSK);
 
-	generate_file_parity(i);
 
     return i;
 }
@@ -796,10 +797,8 @@ void ecall_audit_file(const char *fileName, int *ret)
 	
 	// Call gen_challenge to get {i, Vi}
 	uint8_t indices[NUM_CHAL_BLOCKS];
-	uint8_t *coeffi	uint8_t challNum[KEY_SIZE];
-	if(sgx_read_rand(challNum, KEY_SIZE) != SGX_SUCCESS) {
-		// Handle Error
-	}cients = malloc(sizeof(uint8_t) * ((PRIME_LENGTH / 8) * NUM_CHAL_BLOCKS));
+	uint8_t *coefficients = malloc(sizeof(uint8_t) * ((PRIME_LENGTH / 8) * NUM_CHAL_BLOCKS));
+
 	gen_challenge(files[i].numBlocks, indices, coefficients, files[i].prime); // MAYBE?? reduce coeff mod p
 
 	// JD test 
@@ -847,7 +846,7 @@ void ecall_audit_file(const char *fileName, int *ret)
  	   int sigSeg = floor(indices[j] / sigPerSeg) + startSeg;
  	   int segIndex = indices[j] % sigPerSeg;
 
- 	   hmac_sha1(challKey, KEY_SIZE, (uint8_t *)&sigmaSeg, sizeof(uint8_t), tempKey, &len);
+ 	   hmac_sha1(challKey, KEY_SIZE, (uint8_t *)&sigSeg, sizeof(uint8_t), tempKey, &len);
 
  	   uint8_t sigData[SEGMENT_SIZE];
  	   ocall_get_segment(fileName, sigSeg, sigData);
@@ -869,7 +868,7 @@ void ecall_audit_file(const char *fileName, int *ret)
  	       // handle error
  	   }
 
-		 if (!BN_bin2bn(sigData + (sigIndex * (PRIME_LENGTH / 8)), PRIME_LENGTH / 8, bsigma)) {
+		 if (!BN_bin2bn(sigData + (segIndex * (PRIME_LENGTH / 8)), PRIME_LENGTH / 8, bsigma)) {
   		      // handle error
    		 }
 
@@ -994,7 +993,7 @@ void ecall_audit_file(const char *fileName, int *ret)
 	 		hmac_sha1(challKey, KEY_SIZE, (uint8_t *)&segNum, sizeof(uint8_t), tempKey, &len);
 	 		ocall_get_segment(fileName, segNum, segData);
 	 		DecryptData((uint32_t *)tempKey, segData, KEY_SIZE);
-	 		BN_bin2bn(segData, SEGMENT_SIZE, bsegData);
+	 		BN_bin2bn(segData, SEGMENT_SIZE, bsigData);
 
 			// JD test segment
 			#ifdef TEST_MODE
@@ -1005,8 +1004,8 @@ void ecall_audit_file(const char *fileName, int *ret)
 
 			#endif
 			// end JD test
-			BN_mod(bsegData, bsegData, bprime, ctx);
-			BN_mod_mul(product4, bsegData, alpha, bprime, ctx);
+			BN_mod(bsigData, bsigData, bprime, ctx);
+			BN_mod_mul(product4, bsigData, alpha, bprime, ctx);
 			BN_mod_add(sum, sum, product4, bprime, ctx);
 			BN_CTX_end(ctx);
 		}
