@@ -456,7 +456,7 @@ void write_page(int server_fd)
     int bytes_received = 0;
 	int bytes_left = 4096;
 	while (bytes_left > 0) {
-    	int bytes_read = read(client_fd, blockData + bytes_received, bytes_left);
+    	int bytes_read = read(client_fd, buffer + bytes_received, bytes_left);
     	if (bytes_read < 0) {
         	// handle errors
     	} else if (bytes_read == 0) {
