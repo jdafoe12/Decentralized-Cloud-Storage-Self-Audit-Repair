@@ -414,6 +414,7 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 		magicNumber[i] = temp[i];
 	  }
 	  if(strcmp("PARITY", magicNumber) == 0) {
+		  uart_printf("GOT MAGIC NUMBER!\n");
 		loc += 7;
 		// generate groupKey... this _should_ be the only tempKey?
 		hmac_sha1(dh_sharedKey, KEY_SIZE, temp + loc, KEY_SIZE, tempKey, &keySize);
@@ -426,8 +427,10 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 		// get Proof length and secret length
 		
 		proofLen = (int) *(temp + (loc + sizeof(int)));
+		uart_printf("proof length: %d\n", proofLen);
 		loc += sizeof(int);
 		secretLen = (proofLen / expected_semiRestricted_writes) * 8;
+		uart_printf("secretLen: %d\n", secretLen);
 
 
 		// get proof
@@ -547,9 +550,9 @@ STATUS FTL_Read(PGADDR addr, void* buffer) {
     //FTL_Read(237849, buffer); // the first int (4 bytes) of this will be the page number with correct data.
     //uint8_t *temp = buffer;
     //uint8_t page = temp[0]; // How does this translate to what address to read?
-          uart_printf("%d\n", addr);
+       //   uart_printf("%d\n", addr);
       addr = feistel_network_prp(tempKey, addr, numBits);
-      uart_printf("%d\n", addr);
+     // uart_printf("%d\n", addr);
   }
   
   
@@ -583,13 +586,13 @@ STATUS FTL_Read(PGADDR addr, void* buffer) {
     uint8_t *temp = buffer;
     EncryptData((UINT32 *)tempKey, temp + (512 * page_inx), 512);
     read_state = 0;
-    uart_printf("The Encrypted data are:\n");
-    for(int i = 0; i < 512; i++) {
-      uart_printf("%x", temp[i + (512 * page_inx)]);
-    }
-    uart_printf("\n");
+   // uart_printf("The Encrypted data are:\n");
+  //  for(int i = 0; i < 512; i++) {
+   //   uart_printf("%x", temp[i + (512 * page_inx)]);
+  //  }
+  //  uart_printf("\n");
     
-    uart_printf("Got page, and encrypted!\n");
+ //   uart_printf("Got page, and encrypted!\n");
   }
 
   if(read_state == 1 && addr < 237846/*&& buf_ptr[0] == 'M' && buf_ptr[1] == 'A' && buf_ptr[2] == 'G' && buf_ptr[3] == '2' && buf_ptr[4] == '3'*/ ) {
