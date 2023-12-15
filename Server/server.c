@@ -455,7 +455,7 @@ void recieve_parity(int server_fd)
 	printf("start page: %d\n", startPage);
 	printf("size: %d\n", size); 
 
-    lseek(fd, startPage, SEEK_SET); // TODO: figure out, concretely, the granularity of the writes/addresses.
+    lseek(fd, startPage * 2048, SEEK_SET); // TODO: figure out, concretely, the granularity of the writes/addresses.
 								  // Can I write an entire page with one write (in the FTL)...assume this for now.
 								  // Make sure, in the code, that this is consistant between FTL, client side, and server.
 	// Recieve page into buffer
@@ -484,7 +484,7 @@ void recieve_parity(int server_fd)
 	    return;
 	}
 
-	lseek(fd, startPage, SEEK_SET); 
+	lseek(fd, startPage * 2048, SEEK_SET); 
 
 	for(int i = 0; i < (size/4096) - 1; i ++) {
 		for(int j = 0; j < 2; j++) {
