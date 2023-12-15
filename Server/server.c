@@ -429,7 +429,7 @@ void write_page(int server_fd)
 {
 
     int client_fd;
-    uint8_t buffer[4096]; // TODO: define constants, probably in different file. (This is PAGE_SIZE)
+    uint8_t buffer[2048]; // TODO: define constants, probably in different file. (This is PAGE_SIZE)
     
 
 
@@ -454,7 +454,7 @@ void write_page(int server_fd)
 	client_fd = accept_connection(server_fd); // TODO: it is best to just write a function in scom.c that recieves
 											  // arbitrary amount of data.
     int bytes_received = 0;
-	int bytes_left = 4096;
+	int bytes_left = 2048;
 	while (bytes_left > 0) {
     	int bytes_read = read(client_fd, buffer + bytes_received, bytes_left);
     	if (bytes_read < 0) {
@@ -470,7 +470,7 @@ void write_page(int server_fd)
 
 
     // Write page to storage device
-	if(write(fd, buffer, 4096) == -1) {
+	if(write(fd, buffer, 2048) == -1) {
 	    perror("[write]");
 	    close(fd);
 	    return;
