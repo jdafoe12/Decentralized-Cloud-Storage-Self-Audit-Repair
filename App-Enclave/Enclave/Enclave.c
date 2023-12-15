@@ -179,86 +179,132 @@ void get_sigma(BIGNUM *sigma, BIGNUM **data, BIGNUM **alpha, uint8_t blockNum, u
 }
 
 // TODO: Check that this works
+
 int audit_block_group(int fileNum, int numBlocks, int *blockNums, BIGNUM **sigmas, Tag *tag, uint8_t *data) {
-	BIGNUM *coefficients[numBlocks];
-	
-	BIGNUM *bn_coefficient;
-    BIGNUM *bn_prime = BN_bin2bn(files[fileNum].prime, PRIME_LENGTH / 8, NULL);
+    if (fileNum < 0 || numBlocks <= 0 || !blockNums || !sigmas || !tag || !data) {
+        return -1; // Invalid input
+    }
+
+    ocall_printf("in audit_block_group", 21, 0);
+
     BN_CTX *ctx = BN_CTX_new();
-	BIGNUM *product1 = BN_new();
-	BN_zero(product1);
-	BIGNUM *sigma = BN_new();
-	BN_zero(sigma);
+    BIGNUM *bn_prime = BN_bin2bn(files[fileNum].prime, PRIME_LENGTH / 8, NULL);
+    BIGNUM *sigma = BN_new(), *sigma2 = BN_new(), *sum1 = BN_new(), *sum2 = BN_new();
+    if (!ctx || !bn_prime || !sigma || !sigma2 || !sum1 || !sum2) {
+        BN_free(bn_prime);
+        BN_CTX_free(ctx);
+        BN_free(sigma);
+        BN_free(sigma2);
+        BN_free(sum1);
+        BN_free(sum2);
+        return -1; // Memory allocation failure
+    }
 
-
-	for(int i = 0; i < numBlocks; i++) {
-            coefficients[i] = BN_new();
-            BN_rand_range(coefficients[i], bn_prime);
-			BN_mod_mul(product1, sigmas[i], coefficients[i], bn_prime, ctx);
-    	    BN_mod_add(sigma, sigma, product1, bn_prime, ctx);
-	}
-
-	// BIGNUM sigma now contains master sigma!
+    BIGNUM **coefficients = (BIGNUM **)malloc(numBlocks * sizeof(BIGNUM *));
+    if (!coefficients) {
+        goto cleanup;
+    }
 	
-	BIGNUM *sum1 = BN_new();
-	BN_zero(sum1);
-	BIGNUM *sum2 = BN_new();
-	BN_zero(sum2);
-	BIGNUM *sigma2 = BN_new();
-	BN_zero(sigma2);
+	BIGNUM *tempProduct = BN_new();
+	BN_zero(tempProduct);
+    for (int i = 0; i < numBlocks; i++) {
+        coefficients[i] = BN_new();
+        if (!coefficients[i] || !sigmas[i]) {
+            goto cleanup;
+        }
+        BN_rand_range(coefficients[i], bn_prime);
+        BN_mod_mul(tempProduct, sigmas[i], coefficients[i], bn_prime, ctx);
+        BN_mod_add(sigma, sigma, tempProduct, bn_prime, ctx);
+		BN_zero(tempProduct);
+    }
 
-	for(int i = 0; i < numBlocks; i++) {
-		BIGNUM *product2 = BN_new();
-		BN_zero(product2);
-		BIGNUM *blockRand = BN_new();
-		BN_zero(blockRand);
+    for (int i = 0; i < numBlocks; i++) {
+        BIGNUM *product2 = BN_new();
+        BIGNUM *blockRand = BN_new();
+        if (!product2 || !blockRand) {
+            goto cleanup; 
+        }
 
-		generate_random_mod_p(tag->prfKey, KEY_SIZE, &blockNums[i], sizeof(uint8_t), bn_prime, blockRand);
+        BN_zero(product2);
+        BN_zero(blockRand);
 
-		BN_mod_mul(product2, blockRand, coefficients[i], bn_prime, ctx);
-		BN_mod_add(sum1, sum1, product2, bn_prime, ctx);
-		BN_CTX_end(ctx);
-	}
+        generate_random_mod_p(tag->prfKey, KEY_SIZE, &blockNums[i], sizeof(uint8_t), bn_prime, blockRand);
+        BN_mod_mul(product2, blockRand, coefficients[i], bn_prime, ctx);
+        BN_mod_add(sum1, sum1, product2, bn_prime, ctx);
 
-	for(int i = 0; i < numBlocks; i++) {
-		BIGNUM *sum = BN_new();
-		BN_zero(sum);
-		BIGNUM *product3 = BN_new();
-		BN_zero(product3);
+        BN_free(product2);
+        BN_free(blockRand);
+    }
 
-		for(int j = 0; j < SEGMENT_PER_BLOCK; j++) {
+    for (int j = 0; j < numBlocks; j++) {
+        BIGNUM *sum = BN_new();
+        BIGNUM *product3 = BN_new();
+        if (!sum || !product3) {
+            goto cleanup; 
+        }
 
-			BIGNUM *product4 = BN_new();
-			BN_zero(product4);
+        BN_zero(sum);
+
+        for (int i = 0; i < SEGMENT_PER_BLOCK; i++) {
+
+
 			BIGNUM *alpha = BN_new();
-			BN_zero(alpha);
-			BIGNUM *bsegData = BN_new();
-			BN_zero(bsegData);
-			BN_bin2bn(tag->alpha[j], PRIME_LENGTH / 8, alpha);
+            BIGNUM *product4 = BN_new();
+            BIGNUM *bsegData = BN_new();
+            if (!product4 || !bsegData || !alpha) {
+                goto cleanup; 
+            }
 
-			// get segment data as bignum
-			BN_bin2bn(bsegData, SEGMENT_SIZE, data + (i * BLOCK_SIZE) + (j * SEGMENT_SIZE));
+            BN_zero(product4);
+            BN_zero(bsegData);
+       		BN_zero(alpha);
+      		BN_bin2bn(tag->alpha[i], PRIME_LENGTH / 8, alpha);
+
+
+            BN_bin2bn(data + (j * BLOCK_SIZE) + (i * SEGMENT_SIZE), SEGMENT_SIZE, bsegData);
 			BN_mod(bsegData, bsegData, bn_prime, ctx);
-			BN_mod_mul(product4, bsegData, alpha, bn_prime, ctx);
-			BN_mod_add(sum, sum, product4, bn_prime, ctx);
-		}
-		BN_mod_mul(product3, sum, coefficients[i], bn_prime, ctx);
-		BN_mod_add(sum2, sum2, product3, bn_prime, ctx);
-	}
+            BN_mod_mul(product4, bsegData, alpha, bn_prime, ctx);
+            BN_mod_add(sum, sum, product4, bn_prime, ctx);
 
-	BN_mod_add(sigma2, sum1, sum2, bn_prime, ctx);
-	BN_CTX_end(ctx);
+            BN_free(product4);
+            BN_free(bsegData);
+			BN_free(alpha);
+        }
 
-	uint8_t sigs[PRIME_LENGTH / 8];
-	BN_bn2bin(sigma, sigs);
-	ocall_printf("SIGMA (1 and 2): ", 18, 0);
-	ocall_printf(sigs, PRIME_LENGTH / 8, 1);
-	BN_bn2bin(sigma2, sigs);
-	ocall_printf(sigs, PRIME_LENGTH / 8, 1);
+        BN_mod_mul(product3, sum, coefficients[j], bn_prime, ctx);
+        BN_mod_add(sum2, sum2, product3, bn_prime, ctx);
 
-	return BN_cmp(sigma, sigma2);
+        BN_free(sum);
+        BN_free(product3);
+    }
+
+    BN_mod_add(sigma2, sum1, sum2, bn_prime, ctx);
+
+    uint8_t sigs[PRIME_LENGTH / 8];
+    BN_bn2bin(sigma, sigs);
+    ocall_printf("SIGMA (1 and 2): ", 18, 0);
+    ocall_printf(sigs, PRIME_LENGTH / 8, 1);
+    BN_bn2bin(sigma2, sigs);
+    ocall_printf(sigs, PRIME_LENGTH / 8, 1);
+
+    int result = BN_cmp(sigma, sigma2);
+
+cleanup:
+    if (coefficients) {
+        for (int i = 0; i < numBlocks; i++) {
+            BN_free(coefficients[i]);
+        }
+        free(coefficients);
+    }
+    BN_free(bn_prime);
+    BN_CTX_free(ctx);
+    BN_free(sigma);
+    BN_free(sigma2);
+    BN_free(sum1);
+    BN_free(sum2);
+
+    return result;
 }
-
 
 /*
  * Generate parity. Called by ecall_file_init to generate the parity data after sending the file with tags to storage device.
@@ -297,7 +343,6 @@ void ecall_generate_file_parity(int fileNum)
 							     * and tells it how many bits are being used in the permutation. 
 							     */
 
-
     uint64_t **groups = get_groups(files[fileNum].sortKey, numBlocks, numGroups);
 
     int blockNum = 0;
@@ -322,7 +367,10 @@ void ecall_generate_file_parity(int fileNum)
 
         for (int groupBlock = 0; groupBlock < maxBlocksPerGroup; groupBlock++) { 
             blockNum = groups[group][groupBlock];
-            ocall_printf(&blockNum, 4, 1);
+			// JD_TEST
+			ocall_printf("block number:", 14,0);
+            ocall_printf((uint8_t *)&blockNum, sizeof(uint8_t), 2);
+			// END JD_TEST
             if (groups[group][groupBlock] == -1) { // This group is not full (it has less than maxBlocksPerGroup blocks). 
                 continue;
             }
@@ -330,18 +378,33 @@ void ecall_generate_file_parity(int fileNum)
 
             for (int blockPage = 0; blockPage < PAGE_PER_BLOCK; blockPage++) {
                 pageNum = (blockNum * PAGE_PER_BLOCK) + blockPage;
-                //ocall_printf(&pageNum, sizeof(int), 1);
+
                 permutedPageNum = feistel_network_prp(sharedKey, pageNum, numBits);
-                //ocall_printf(&permutedPageNum, sizeof(int), 1);
+				// JD_TEST
+				ocall_printf("page number:", 13,0);
+				ocall_printf((uint8_t *) &pageNum, sizeof(uint8_t), 2);
+				ocall_printf("permuted page number:", 22, 0);
+                ocall_printf((uint8_t *) &permutedPageNum, sizeof(uint8_t), 2);
+				// END JD_TEST
+
 
                 for (int pageSeg = 0; pageSeg < SEGMENT_PER_BLOCK / PAGE_PER_BLOCK; pageSeg++) {
                     segNum = (permutedPageNum * SEGMENT_PER_PAGE) + pageSeg;
                     ocall_get_segment(files[fileNum].fileName, segNum, segData);
-					ocall_printf("THE ENCRYPTED DATA ARE:\n", 25, 0);
-                    ocall_printf(segData, SEGMENT_SIZE, 1);
+					//JD_TEST
 					ocall_printf("--------------------------------------------\n\n\n", 50, 0);
+					ocall_printf("(permuted) segment number:", 27,0);
+					ocall_printf((uint8_t *) &segNum, sizeof(uint8_t), 2);
+					ocall_printf("The segment encrypted data:", 28, 0);
+                    ocall_printf(segData, SEGMENT_SIZE, 1);
+					//END JD_TEST
 
-                    DecryptData((uint32_t *)sharedKey, segData, SEGMENT_SIZE); // TODO: check that decrypted data are same as original.
+                    DecryptData((uint32_t *)sharedKey, segData, SEGMENT_SIZE); 					
+					//JD_TEST 
+					ocall_printf("The segment decrypted data:", 28,0);
+					ocall_printf(segData, SEGMENT_SIZE, 1);
+					ocall_printf("--------------------------------------------\n\n\n", 50, 0);
+					//END JD_TEST
 
 					// TODO: Perform an integrity check on the *BLOCKS* as they are received. 
 					// This will be challenging, still have to hide location of tags, etc. 
@@ -367,11 +430,28 @@ void ecall_generate_file_parity(int fileNum)
 	    int tagSegNum = totalSegments + ceil((double)files[fileNum].numBlocks /(double) sigPerSeg);
 		int tagPageNum = floor(tagSegNum / SEGMENT_PER_PAGE);
 		// Permute tagPageNum
-		permutedPageNum = feistel_network_prp(sharedKey, pageNum, numBits);
+		permutedPageNum = feistel_network_prp(sharedKey, tagPageNum, numBits);
 		tagSegNum = (permutedPageNum * SEGMENT_PER_PAGE) + (tagSegNum % tagPageNum); // note, the tag is after the file, 
 																					// so numBits may be wrong
+		// JD_TEST
+		ocall_printf("Have group data. Audit now.", 28, 0);
+		ocall_printf("Tag page number:", 17, 0);
+		ocall_printf((uint8_t *) &tagPageNum, sizeof(uint8_t), 2);
+		ocall_printf("permuted tag page number:", 26,0);
+		ocall_printf((uint8_t *) &permutedPageNum, sizeof(uint8_t), 2);
+		// END JD_TEST
+
 		ocall_get_segment(files[fileNum].fileName, tagSegNum, segData);
+		// JD_TEST 
+		ocall_printf("encrypted tag segment data:", 28, 0);
+		ocall_printf(segData, SEGMENT_SIZE, 1);
+		// END JD_TEST
 		DecryptData((uint32_t *)sharedKey, segData, SEGMENT_SIZE); 
+		// JD_TEST
+		ocall_printf("decrypted tag segment data:", 28, 0);
+		ocall_printf(segData, SEGMENT_SIZE, 1);
+		// END JD_TEST
+
 
 		// Note, I will know that tag and sigmas come from FTL, as they are fully encrypted.
 		Tag *tag = (Tag *)malloc(sizeof(Tag));
@@ -381,29 +461,79 @@ void ecall_generate_file_parity(int fileNum)
 		// Get sigmas
 		BIGNUM *sigmas[blocksInGroup];
 
+
 		for(int i = 0; i < blocksInGroup; i++) {
-			sigmas[i] = BN_new();
-			BN_zero(sigmas[i]);
+ 		   sigmas[i] = BN_new();
+		    BN_zero(sigmas[i]);
 
-			int startSeg = totalSegments;
- 	   		int sigSeg = floor(groups[group][i] / sigPerSeg) + startSeg;
- 	   		int segIndex = groups[group][i] % sigPerSeg;
+		    int startSeg = totalSegments;
+		    int sigSegNum = floor(groups[group][i] / sigPerSeg) + startSeg;
+		    int sigPageNum = floor(sigSegNum / SEGMENT_PER_PAGE);
 
-			uint8_t sigData[SEGMENT_SIZE];
- 	   		ocall_get_segment(files[fileNum].fileName, sigSeg, sigData);
+		    // Permute sigPageNum
+		    permutedPageNum = feistel_network_prp(sharedKey, sigPageNum, numBits);
+		    int permutedSigSegNum = (permutedPageNum * SEGMENT_PER_PAGE) + (sigSegNum % SEGMENT_PER_PAGE);
 
- 	   		DecryptData((uint32_t *)sharedKey, sigData, SEGMENT_SIZE);
+		    // JD_TEST
+		    ocall_printf("Retrieving sigma. Original page number:", 39, 0);
+		    ocall_printf((uint8_t *)&sigPageNum, sizeof(uint8_t), 2);
+		    ocall_printf("Permuted page number for sigma:", 31, 0);
+		    ocall_printf((uint8_t *)&permutedPageNum, sizeof(uint8_t), 2);
+		    ocall_printf("Segment number for sigma:", 26, 0);
+		    ocall_printf((uint8_t *)&permutedSigSegNum, sizeof(uint8_t), 2);
+		    // END JD_TEST
 
-			BN_bin2bn(sigData + (segIndex * (PRIME_LENGTH / 8)), PRIME_LENGTH / 8, sigmas[i]);
+		    uint8_t sigData[SEGMENT_SIZE];
+		    ocall_get_segment(files[fileNum].fileName, permutedSigSegNum, sigData);
+
+		    // JD_TEST
+		    ocall_printf("Encrypted sigma segment data:", 30, 0);
+		    ocall_printf(sigData, SEGMENT_SIZE, 1);
+		    // END JD_TEST
+
+		    DecryptData((uint32_t *)sharedKey, sigData, SEGMENT_SIZE);
+
+ 		   // JD_TEST
+		    ocall_printf("Decrypted sigma segment data:", 30, 0);
+		    ocall_printf(sigData, SEGMENT_SIZE, 1);
+		    // END JD_TEST
+
+		    int segIndex = groups[group][i] % sigPerSeg;
+		    BN_bin2bn(sigData + (segIndex * (PRIME_LENGTH / 8)), PRIME_LENGTH / 8, sigmas[i]);
 		}
 
 		// TODO: a lot of repeated code between audit_file and here. This is the same between audit_block_group, and audit_file.
 		// Much of this can be refactored to work really well.
+		ocall_printf("start audit", 12, 0);
 
-		if(audit_block_group(fileNum, blocksInGroup, groups[group], sigmas, tag, groupData) != 0) {
-			// Invalid data. Handle error.
-			ocall_printf("AUDIT FAILED!!", 15, 0);
+		// Print the 'fileNum' argument
+		ocall_printf("File Number:", 13, 0);
+		ocall_printf((uint8_t *)&fileNum, sizeof(fileNum), 2);
+
+		// Print the 'blocksInGroup' argument
+		ocall_printf("Blocks in Group:", 17, 0);
+		ocall_printf((uint8_t *)&blocksInGroup, sizeof(blocksInGroup), 2);
+
+		// Print the 'groups[group]' argument (block numbers in the group)
+		ocall_printf("Blocks in the Current Group:", 29, 0);
+		for (int i = 0; i < blocksInGroup; i++) {
+		    ocall_printf((uint8_t *)&groups[group][i], sizeof(groups[group][i]), 2);
 		}
+
+		// Print the 'sigmas' argument
+		ocall_printf("Sigma values:", 14, 0);
+		for (int i = 0; i < blocksInGroup; i++) {
+		    uint8_t sigmaBuffer[PRIME_LENGTH / 8]; // Adjust the buffer size based on PRIME_LENGTH
+		    BN_bn2bin(sigmas[i], sigmaBuffer);
+		    ocall_printf(sigmaBuffer, PRIME_LENGTH / 8, 1);
+		}
+
+		if (audit_block_group(fileNum, blocksInGroup, groups[group], sigmas, tag, groupData) != 0) {
+		    ocall_printf("AUDIT FAILED!!", 15, 0);
+		} else {
+		    ocall_printf("AUDIT SUCCESS?", 15, 0);
+		}
+
 
 		// Setup RS parameters
         int groupByteSize = blocksInGroup * BLOCK_SIZE;
@@ -599,7 +729,6 @@ void ecall_init()
 // Initialize the file with PoR Tags
 int ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBlocks) 
 {
-
     int i, j;
     uint8_t blockNum;
     BIGNUM *prime;
@@ -707,6 +836,7 @@ int ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBlock
 		// end JD test
 
         BN_bn2binpad(sigma_bn, sigma + (blockNum * (PRIME_LENGTH/8)), ceil((double)PRIME_LENGTH/8));
+		ocall_printf(sigma + (blockNum * (PRIME_LENGTH/8)),PRIME_LENGTH/8, 1);
         BN_free(sigma_bn);
         for(int k = 0; k < SEGMENT_PER_BLOCK; k++) {
             BN_free(data_bn[k]);
@@ -723,8 +853,9 @@ int ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBlock
     // Process tag (enc and MAC)
     tag->n = blockNum;
     // Encrypt alpha with encKey and perform MAC
+	ocall_printf("prep_tag",9,0);
     prepare_tag(tag, porSK);
-
+	ocall_printf("done",5,0);
 
     return i;
 }

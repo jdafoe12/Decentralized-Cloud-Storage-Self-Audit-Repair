@@ -37,47 +37,65 @@ void generate_random_mod_p(char* prf_key, int key_len, unsigned char *i, int i_l
     BN_free(bn_prf);
 }
 
-void prepare_tag(Tag *tag, PorSK porSk) 
-{
+
+
+void prepare_tag(Tag *tag, PorSK porSk) {
+    if (!tag || !porSk.encKey || !porSk.macKey) {
+        // Handle null pointer error
+        return;
+    }
+
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    if (!ctx) {
+        // Handle error
+        return;
+    }
+
     // Define IV for testing purposes only
     const unsigned char iv[] = "0123456789abcdef";
-    
+
     // Encrypt alpha using encKey
     int outlen;
     int len = (SEGMENT_PER_BLOCK * PRIME_LENGTH / 8) + KEY_SIZE;
     unsigned char *out = malloc(len + EVP_MAX_BLOCK_LENGTH);
-
-    if (out == NULL) {
+    if (!out) {
+        EVP_CIPHER_CTX_free(ctx);
         // Handle memory allocation error
+        return;
     }
 
     EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, porSk.encKey, iv);
     EVP_EncryptUpdate(ctx, out, &outlen, tag->prfKey, len);
     EVP_EncryptFinal_ex(ctx, out + outlen, &outlen);
     memcpy(tag->prfKey, out, len);
+    free(out);
 
-    
     // Compute MAC using macKey
-    ctx = EVP_CIPHER_CTX_new();
     EVP_MD_CTX *md_ctx = EVP_MD_CTX_new();
+    if (!md_ctx) {
+        EVP_CIPHER_CTX_free(ctx);
+        // Handle error
+        return;
+    }
+
     const EVP_MD *md = EVP_sha1();
     uint8_t *mac_data[3] = { (uint8_t*)&tag->n, tag->prfKey, (uint8_t*)tag->alpha };
     int mac_data_len[3] = { sizeof(tag->n), KEY_SIZE, (PRIME_LENGTH / 8) * SEGMENT_PER_BLOCK };
     uint8_t mac[MAC_SIZE];
-    int mac_len;
+    unsigned int mac_len;
 
+    EVP_DigestInit_ex(md_ctx, md, NULL);
     EVP_DigestUpdate(md_ctx, porSk.macKey, MAC_SIZE);
     for (int i = 0; i < 3; i++) {
         EVP_DigestUpdate(md_ctx, mac_data[i], mac_data_len[i]);
     }
+
     EVP_DigestFinal_ex(md_ctx, mac, &mac_len);
+    memcpy(tag->MAC, mac, MAC_SIZE);
+
     EVP_CIPHER_CTX_free(ctx);
     EVP_MD_CTX_free(md_ctx);
-
-    memcpy(tag->MAC, mac, MAC_SIZE);
 }
-
 
 void decrypt_tag(Tag *tag, PorSK porSk) 
 {

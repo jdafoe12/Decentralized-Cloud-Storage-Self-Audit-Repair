@@ -167,9 +167,15 @@ void ocall_ftl_init(uint8_t *sgx_pubKey, uint8_t *ftl_pubKey)
 /* Used for debugging purposes, to print a value within the enclave */
 void ocall_printf(unsigned char *buffer, size_t size, int type) 
 {
-	if(type == 1){
+	if(type == 1) {
 		for(int i = 0; i < (int)size; i++) {
-			printf("%x", buffer[i]);
+			printf("%X", buffer[i]);
+		}
+		printf("\n");
+	}
+	else if(type == 2) {
+		for(int i = 0; i < (int)size; i++) {
+			printf("%d%",buffer[i]);
 		}
 		printf("\n");
 	}
@@ -226,7 +232,6 @@ void app_file_init(sgx_enclave_id_t eid, const char *fileName,  int numBlocks)
         printf("Error calling enclave function: %d\n", status);
         return;
     }
-	//printf("done ecal\n");
 
 
     /* Open the file for reading */
@@ -315,6 +320,7 @@ void app_file_init(sgx_enclave_id_t eid, const char *fileName,  int numBlocks)
 
     fclose(file);
 	/* server function file_init has now completed execution, it does not require any more data */
+	printf("generate parity!\n");
     ecall_generate_file_parity(eid, fileNum); // Note: The convention for this call is slightly different than the rest of the file initialization.
                                          // Above, the gennerated data is directly retrurned, rather than written via an ocall, as is done here.
 }
@@ -345,7 +351,8 @@ int main(void)
     //gettimeofday(&start_time, NULL);
     printf("Call FTL init\n");
     ret = ecall_init(eid);
-    //gettimeofday(&end_time, NULL);
+    
+	//gettimeofday(&end_time, NULL);
     //waittime = 3;
     //cpu_time_used = (end_time.tv_sec - start_time.tv_sec) + (end_time.tv_usec - start_time.tv_usec) / 1000000.0;
     //printf("INIT TIME: %f with %d wait time\n", cpu_time_used, waittime);
@@ -357,7 +364,7 @@ int main(void)
 
     // Data for initialization provided by local file at the filePath of fileName
     char fileName[512];
-    strcpy(fileName, "/home/jdafoe/Decentralized-Cloud/integrityCheck/testFile");
+    strcpy(fileName, "/home/jdafoe/Decentralized-Cloud-Storage-Self-Audit-Repair/App-Enclave/testFile");
     int numBlocks = 10;
 
     // Perform file initialization in SGX
