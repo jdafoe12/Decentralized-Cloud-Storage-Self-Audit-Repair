@@ -23,8 +23,8 @@
 void ocall_send_parity(int startPage, uint8_t *parityData, size_t size)
 {
     send_data_to_server("send_parity", 12);
-	send_data_to_server(size, sizeof(size_t));
-	send_data_to_server(startPage, sizeof(int));
+	send_data_to_server(&size, sizeof(size_t));
+	send_data_to_server(&startPage, sizeof(int));
     send_data_to_server(parityData, sizeof(uint8_t) * size);
 
 }
@@ -51,7 +51,7 @@ void ocall_send_nonce(uint8_t *nonce)
 	send_data_to_server("get_nonce", 12); // TODO: Change this on server side to nonce.
 
 	/* Send challnum to server */
-	send_data_to_server(nonce, sizeof(uint8_t) * KEY_SIZE);
+	send_data_to_server(&nonce, sizeof(uint8_t) * KEY_SIZE);
 }
 
 void ocall_get_segment(const char *fileName, int segNum, uint8_t *segData) 

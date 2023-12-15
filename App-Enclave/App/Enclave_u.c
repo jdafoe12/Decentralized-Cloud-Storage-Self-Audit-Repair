@@ -53,10 +53,11 @@ typedef struct ms_ocall_init_parity_t {
 	int ms_numBits;
 } ms_ocall_init_parity_t;
 
-typedef struct ms_ocall_write_page_t {
-	int ms_address;
-	uint8_t* ms_page;
-} ms_ocall_write_page_t;
+typedef struct ms_ocall_send_parity_t {
+	int ms_startPage;
+	uint8_t* ms_parityData;
+	size_t ms_size;
+} ms_ocall_send_parity_t;
 
 typedef struct ms_sgx_oc_cpuidex_t {
 	int* ms_cpuinfo;
@@ -150,10 +151,10 @@ static sgx_status_t SGX_CDECL Enclave_ocall_init_parity(void* pms)
 	return SGX_SUCCESS;
 }
 
-static sgx_status_t SGX_CDECL Enclave_ocall_write_page(void* pms)
+static sgx_status_t SGX_CDECL Enclave_ocall_send_parity(void* pms)
 {
-	ms_ocall_write_page_t* ms = SGX_CAST(ms_ocall_write_page_t*, pms);
-	ocall_write_page(ms->ms_address, ms->ms_page);
+	ms_ocall_send_parity_t* ms = SGX_CAST(ms_ocall_send_parity_t*, pms);
+	ocall_send_parity(ms->ms_startPage, ms->ms_parityData, ms->ms_size);
 
 	return SGX_SUCCESS;
 }
@@ -234,7 +235,7 @@ static const struct {
 		(void*)Enclave_ocall_send_nonce,
 		(void*)Enclave_ocall_get_segment,
 		(void*)Enclave_ocall_init_parity,
-		(void*)Enclave_ocall_write_page,
+		(void*)Enclave_ocall_send_parity,
 		(void*)Enclave_sgx_oc_cpuidex,
 		(void*)Enclave_sgx_thread_wait_untrusted_event_ocall,
 		(void*)Enclave_sgx_thread_set_untrusted_event_ocall,

@@ -79,10 +79,11 @@ typedef struct ms_ocall_init_parity_t {
 	int ms_numBits;
 } ms_ocall_init_parity_t;
 
-typedef struct ms_ocall_write_page_t {
-	int ms_address;
-	uint8_t* ms_page;
-} ms_ocall_write_page_t;
+typedef struct ms_ocall_send_parity_t {
+	int ms_startPage;
+	uint8_t* ms_parityData;
+	size_t ms_size;
+} ms_ocall_send_parity_t;
 
 typedef struct ms_sgx_oc_cpuidex_t {
 	int* ms_cpuinfo;
@@ -772,19 +773,19 @@ sgx_status_t SGX_CDECL ocall_init_parity(int numBits)
 	return status;
 }
 
-sgx_status_t SGX_CDECL ocall_write_page(int address, uint8_t* page)
+sgx_status_t SGX_CDECL ocall_send_parity(int startPage, uint8_t* parityData, size_t size)
 {
 	sgx_status_t status = SGX_SUCCESS;
-	size_t _len_page = PAGE_SIZE;
+	size_t _len_parityData = size;
 
-	ms_ocall_write_page_t* ms = NULL;
-	size_t ocalloc_size = sizeof(ms_ocall_write_page_t);
+	ms_ocall_send_parity_t* ms = NULL;
+	size_t ocalloc_size = sizeof(ms_ocall_send_parity_t);
 	void *__tmp = NULL;
 
 
-	CHECK_ENCLAVE_POINTER(page, _len_page);
+	CHECK_ENCLAVE_POINTER(parityData, _len_parityData);
 
-	if (ADD_ASSIGN_OVERFLOW(ocalloc_size, (page != NULL) ? _len_page : 0))
+	if (ADD_ASSIGN_OVERFLOW(ocalloc_size, (parityData != NULL) ? _len_parityData : 0))
 		return SGX_ERROR_INVALID_PARAMETER;
 
 	__tmp = sgx_ocalloc(ocalloc_size);
@@ -792,32 +793,37 @@ sgx_status_t SGX_CDECL ocall_write_page(int address, uint8_t* page)
 		sgx_ocfree();
 		return SGX_ERROR_UNEXPECTED;
 	}
-	ms = (ms_ocall_write_page_t*)__tmp;
-	__tmp = (void *)((size_t)__tmp + sizeof(ms_ocall_write_page_t));
-	ocalloc_size -= sizeof(ms_ocall_write_page_t);
+	ms = (ms_ocall_send_parity_t*)__tmp;
+	__tmp = (void *)((size_t)__tmp + sizeof(ms_ocall_send_parity_t));
+	ocalloc_size -= sizeof(ms_ocall_send_parity_t);
 
-	if (memcpy_verw_s(&ms->ms_address, sizeof(ms->ms_address), &address, sizeof(address))) {
+	if (memcpy_verw_s(&ms->ms_startPage, sizeof(ms->ms_startPage), &startPage, sizeof(startPage))) {
 		sgx_ocfree();
 		return SGX_ERROR_UNEXPECTED;
 	}
 
-	if (page != NULL) {
-		if (memcpy_verw_s(&ms->ms_page, sizeof(uint8_t*), &__tmp, sizeof(uint8_t*))) {
+	if (parityData != NULL) {
+		if (memcpy_verw_s(&ms->ms_parityData, sizeof(uint8_t*), &__tmp, sizeof(uint8_t*))) {
 			sgx_ocfree();
 			return SGX_ERROR_UNEXPECTED;
 		}
-		if (_len_page % sizeof(*page) != 0) {
+		if (_len_parityData % sizeof(*parityData) != 0) {
 			sgx_ocfree();
 			return SGX_ERROR_INVALID_PARAMETER;
 		}
-		if (memcpy_verw_s(__tmp, ocalloc_size, page, _len_page)) {
+		if (memcpy_verw_s(__tmp, ocalloc_size, parityData, _len_parityData)) {
 			sgx_ocfree();
 			return SGX_ERROR_UNEXPECTED;
 		}
-		__tmp = (void *)((size_t)__tmp + _len_page);
-		ocalloc_size -= _len_page;
+		__tmp = (void *)((size_t)__tmp + _len_parityData);
+		ocalloc_size -= _len_parityData;
 	} else {
-		ms->ms_page = NULL;
+		ms->ms_parityData = NULL;
+	}
+
+	if (memcpy_verw_s(&ms->ms_size, sizeof(ms->ms_size), &size, sizeof(size))) {
+		sgx_ocfree();
+		return SGX_ERROR_UNEXPECTED;
 	}
 
 	status = sgx_ocall(6, ms);

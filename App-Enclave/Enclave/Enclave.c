@@ -639,7 +639,11 @@ void ecall_generate_file_parity(int fileNum)
 		// Now, simply write parityData to FTL. NOTE: no special OCALL required... note, we ARE doing this on a group by group basis.
 		// There is also a lot of room for refactorization in this code
 		ocall_printf("here1",6,0);
-		ocall_send_pairty(PARITY_START + startPage, parityData[i], (numParityBlocks + 1) * BLOCK_SIZE);
+		uint8_t goodParData[(numParityBlocks + 1) * BLOCK_SIZE];
+		for(int i = 0; i < numParityBlocks + 1; i++) {
+			memcpy(goodParData + (i * BLOCK_SIZE), parityData[i], BLOCK_SIZE);
+		}
+		ocall_send_parity(PARITY_START + startPage, goodParData, (numParityBlocks + 1) * BLOCK_SIZE);
 
 		startPage += numParityBlocks * PAGE_PER_BLOCK;
 

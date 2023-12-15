@@ -440,7 +440,7 @@ void recieve_parity(int server_fd)
     // Receive size
     size_t size = 0;
     client_fd = accept_connection(server_fd);
-    read(client_fd, size, sizeof(size));
+    read(client_fd, &size, sizeof(size));
     close(client_fd);
 
     uint8_t buffer[size];
@@ -449,10 +449,11 @@ void recieve_parity(int server_fd)
 	// Recieve startPage
     int startPage = 0;
     client_fd = accept_connection(server_fd);
-    read(client_fd, startPage, sizeof(startPage));
+    read(client_fd, &startPage, sizeof(startPage));
     close(client_fd);
 
-
+	printf("start page: %d\n", startPage);
+	printf("size: %d\n", size); 
 
     lseek(fd, startPage, SEEK_SET); // TODO: figure out, concretely, the granularity of the writes/addresses.
 								  // Can I write an entire page with one write (in the FTL)...assume this for now.
@@ -475,7 +476,7 @@ void recieve_parity(int server_fd)
     }
 	close(client_fd);
 
-
+	
     // Write page to storage device
 	if(write(fd, buffer, 2048) == -1) {
 	    perror("[write]");

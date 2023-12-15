@@ -395,9 +395,18 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 	
   }
   if(addr >= restricted_area_end && addr <= 10000) {
+	  uart_printf("Recieving parity data...\n");
+	  
 	  size_t keySize = KEY_SIZE;
 	  // very first is to check magic number. if it is "PARITY", then set expected_semiRestricted_writes and current_semiRestricted_writes to 0.
 	  uint8_t *temp = buffer;
+
+	  for(int i = 0; i < 2048; i++){
+		uart_printf("%c", temp[i]);
+	  }
+	  uart_printf("\n\n");
+
+
 	  int loc = 0;
 
 	  char magicNumber[7] = {0};

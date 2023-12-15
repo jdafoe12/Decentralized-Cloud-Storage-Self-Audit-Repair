@@ -41,9 +41,9 @@ void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_get_segment, (const char* fileName, int
 #define OCALL_INIT_PARITY_DEFINED__
 void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_init_parity, (int numBits));
 #endif
-#ifndef OCALL_WRITE_PAGE_DEFINED__
-#define OCALL_WRITE_PAGE_DEFINED__
-void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_write_page, (int address, uint8_t* page));
+#ifndef OCALL_SEND_PARITY_DEFINED__
+#define OCALL_SEND_PARITY_DEFINED__
+void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_send_parity, (int startPage, uint8_t* parityData, size_t size));
 #endif
 #ifndef SGX_OC_CPUIDEX_DEFINED__
 #define SGX_OC_CPUIDEX_DEFINED__
