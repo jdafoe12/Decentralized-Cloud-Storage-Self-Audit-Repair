@@ -402,7 +402,7 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 	  uint8_t *temp = buffer;
 
 	  for(int i = 0; i < 2048; i++){
-		uart_printf("%c", temp[i]);
+		uart_printf("%x", temp[i]);
 	  }
 	  uart_printf("\n\n");
 
@@ -500,6 +500,7 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 				current_semiRestricted_writes = 0;
 				hmac_sha1(tempKey, KEY_SIZE, signedVerificationResult, sizeof(int), signedVerificationResult + 1, &keySize);
 				signedVerificationResult[0] = verificationResult;
+				uart_printf("verification result: %d\n", verificationResult);
 				FTL_Write(1000, signedVerificationResult);
 			}
 		}
