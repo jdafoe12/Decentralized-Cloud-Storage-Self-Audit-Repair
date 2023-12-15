@@ -425,13 +425,10 @@ void state_2(int server_fd)
 
 }
 
-void write_page(int server_fd) 
+void recieve_parity(int server_fd) 
 {
 
     int client_fd;
-    uint8_t buffer[2048]; // TODO: define constants, probably in different file. (This is PAGE_SIZE)
-    
-
 
     // Open storage device. ASSUME 1 File for now
     int fd; 
@@ -440,21 +437,31 @@ void write_page(int server_fd)
         return;
     }
 
-    // Receive address
-    int address = 0;
+    // Receive size
+    size_t size = 0;
     client_fd = accept_connection(server_fd);
-    read(client_fd, address, sizeof(address));
+    read(client_fd, size, sizeof(size));
+    close(client_fd);
+
+    uint8_t buffer[size];
+
+
+	// Recieve startPage
+    int startPage = 0;
+    client_fd = accept_connection(server_fd);
+    read(client_fd, startPage, sizeof(startPage));
     close(client_fd);
 
 
-    lseek(fd, address, SEEK_SET); // TODO: figure out, concretely, the granularity of the writes/addresses.
+
+    lseek(fd, startPage, SEEK_SET); // TODO: figure out, concretely, the granularity of the writes/addresses.
 								  // Can I write an entire page with one write (in the FTL)...assume this for now.
 								  // Make sure, in the code, that this is consistant between FTL, client side, and server.
 	// Recieve page into buffer
 	client_fd = accept_connection(server_fd); // TODO: it is best to just write a function in scom.c that recieves
 											  // arbitrary amount of data.
     int bytes_received = 0;
-	int bytes_left = 2048;
+	int bytes_left = size;
 	while (bytes_left > 0) {
     	int bytes_read = read(client_fd, buffer + bytes_received, bytes_left);
     	if (bytes_read < 0) {
@@ -475,7 +482,20 @@ void write_page(int server_fd)
 	    close(fd);
 	    return;
 	}
+
+	lseek(fd, startPage, SEEK_SET); 
+
+	for(int i = 0; i < (size/4096) - 1; i ++) {
+		for(int j = 0; j < 2; j++) {
+			if(write(fd, buffer + (4096 + (4096 * i) + (2048 * j)), 2048) == -1) {
+	    		perror("[write]");
+	    		close(fd);
+				return;
+			}
+		}
+	}
 }
+
 
 main() 
 {
@@ -507,9 +527,9 @@ main()
             printf("get nonce\n");
             get_challnum(server_fd);
         }
-        else if(strcmp(command, "write_page") == 0 ) {
-            printf("write page\n");
-            write_page(server_fd);
+        else if(strcmp(command, "send_parity") == 0 ) {
+            printf("recieve_parity\n");
+            recieve_parity(server_fd);
 
         }
 		else if(strcmp(command, "state_2") == 0) { // TODO: should be changed to writing a signed magic number.

@@ -30,7 +30,7 @@ enclave {
 
 		void ocall_init_parity(int numBits);
 
-		void ocall_write_page(int address, [in, size=PAGE_SIZE] uint8_t *page);
+		void ocall_send_parity(int startPage, [in, size=size] uint8_t *parityData, size_t size);
 
 	};
 };

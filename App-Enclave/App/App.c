@@ -20,11 +20,12 @@
 
 #include <string.h>
 
-void ocall_write_page(int address, uint8_t *page)
+void ocall_send_parity(int startPage, uint8_t *parityData, size_t size)
 {
-    send_data_to_server("write_page", 11);
-	send_data_to_server(address, sizeof(int));
-    send_data_to_server(page, sizeof(uint8_t) * PAGE_SIZE);
+    send_data_to_server("send_parity", 12);
+	send_data_to_server(size, sizeof(size_t));
+	send_data_to_server(startPage, sizeof(int));
+    send_data_to_server(parityData, sizeof(uint8_t) * size);
 
 }
 
