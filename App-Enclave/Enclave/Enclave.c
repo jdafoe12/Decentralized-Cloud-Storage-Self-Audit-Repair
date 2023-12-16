@@ -681,9 +681,27 @@ void ecall_generate_file_parity(int fileNum)
     	free(symbolData);
 		ocall_printf("block group done", 17,0);
 
+		// read from page 1000 and verify proof verification || signature (it uses groupKey).
+		int verificationPage = feistel_network_prp(sharedKey, 1000, log2(1000));
+		int verificationSegment = verificationPage * SEGMENT_PER_PAGE;
+		ocall_printf("get seg", 8, 0);
+
+		ocall_get_segment(files[fileNum].fileName, verificationSegment, segData);
+		// verification is uint8_t * (KEY_SIZE + 1)
+		uint8_t result[KEY_SIZE + 1];
+		result[0] = segData[0];
+		hmac_sha1(groupKey, KEY_SIZE, result, sizeof(uint8_t), result + 1, &len);
+
+		if(memcmp(result + 1, segData + 1, KEY_SIZE) != 0) {
+			ocall_printf("Signature verification failed", 30, 0);
+		}
+		ocall_printf("passed", 7, 0);
+		ocall_printf(result, sizeof(uint8_t), 2);
+
+
     }
 
-	// read from page 1000 and verify proof verification || signature (it uses groupKey).
+	
 	
 
     ocall_init_parity(numBits);
@@ -917,6 +935,7 @@ void ecall_audit_file(const char *fileName, int *ret)
 
 	// Get tag from FTL (Note that tag is always  on final segment. This can be calculated easily)
 	uint8_t segData[SEGMENT_SIZE];
+	ocall_printf("HERE??", 7, 0);
 	ocall_get_segment(fileName, tagSegNum, segData); // ocall get segment will write segNum to addr 951396 then simply read the segment. it should have first 16 bytes encrypted.
 
 	DecryptData((uint32_t *)tempKey, segData, KEY_SIZE);
