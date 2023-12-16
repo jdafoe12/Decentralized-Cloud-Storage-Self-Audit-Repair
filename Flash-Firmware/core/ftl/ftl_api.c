@@ -292,7 +292,15 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
    * 237849 (951396) - Recieve page next page number to be read for current audit.
    * 237850 (951400) - Set genPar to 1 or 0. Set numBits to correct number.
    */
-  
+ 
+  if(addr == 237846) {
+	read_state = 1;
+	gen_par = 0;
+	uart_printf("Read state 1\n");
+	uart_printf("gen_par 0\n");
+	page_inx = temp[0] % 4;
+
+  }
 
   // Generate ecc keypair for diffie hellman
   if(addr == 237847) { // 951388
