@@ -392,9 +392,9 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
   if(addr >= 5000 && addr < restricted_area_end) { // TODO: these "ends" should be defined as constants
   	// writes are simply disabled here.
 	return STATUS_SUCCESS;
-	
   }
-  if(addr >= restricted_area_end && addr <= 10000) {
+  uart_printf("ADDRESS: %d\n", addr);
+  if(addr >= (restricted_area_end) && addr <= 10000) {
 	  uart_printf("Recieving parity data...\n");
 	  
 	  size_t keySize = KEY_SIZE;
@@ -415,18 +415,17 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 	  }
 	  if(strcmp("PARITY", magicNumber) == 0) {
 		  uart_printf("GOT MAGIC NUMBER!\n");
-		loc += 7;
+		loc += 6;
 		// generate groupKey... this _should_ be the only tempKey?
 		hmac_sha1(dh_sharedKey, KEY_SIZE, temp + loc, KEY_SIZE, tempKey, &keySize);
 		loc += KEY_SIZE;
 
 		// get expected_semiRestricted_writes
-		expected_semiRestricted_writes = (int) *(temp + (7 + KEY_SIZE));
+                memcpy(&expected_semiRestricted_writes, temp + loc, sizeof(int));
 		loc += sizeof(int);
 
 		// get Proof length and secret length
-		
-		proofLen = (int) *(temp + (loc + sizeof(int)));
+		memcpy(&proofLen, temp + loc, sizeof(int));
 		uart_printf("proof length: %d\n", proofLen);
 		loc += sizeof(int);
 		secretLen = (proofLen / expected_semiRestricted_writes) * 8;
@@ -445,45 +444,93 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 
 		memcpy(proof, temp + loc, proofLen);
 		loc += proofLen;
+                
+                uart_printf("proof:\n");
+                for(int i = 0; i < proofLen; i++) {
+                  uart_printf("%x", proof[i]);
+                }
+                uart_printf("\n");
 
 		// validate signature
+                uart_printf("temp Key:\n");
+                for(int i = 0; i < KEY_SIZE; i++) {
+                  uart_printf("%x", tempKey[i]);
+                }
+                uart_printf("\n");
 		uint8_t signature[KEY_SIZE];
 		hmac_sha1(tempKey, KEY_SIZE, temp, loc, signature, &keySize);
+                // print signature generated and stored
+                uart_printf("signature:\n");
+                for (int i = 0; i < KEY_SIZE; i++) {
+                  uart_printf("%x", signature[i]);
+                }
+                uart_printf("\n");
+                
+                uart_printf("signature stored:\n");
+                for (int i = 0; i < KEY_SIZE; i++) {
+                  uart_printf("%x", temp[loc + i]);
+                }
+                uart_printf("\n");
+                
+                
 		if(memcmp(signature, temp + loc, KEY_SIZE) != 0) {
 			// Handle error. signature failed.
+                        uart_printf("signature verification failed\n\n");
 			current_semiRestricted_writes = 0;
 			expected_semiRestricted_writes = 0;
 		}
 		//if() // other fail conditions TODO: Think of any additional fail conditions.
-		prng_init((uint32_t) *tempKey);
+		prng_init((uint32_t) tempKey[0]);
 	  }
 	  else if(expected_semiRestricted_writes > current_semiRestricted_writes) {
 		// progressively check proof.
-		if(restricted_area_end + current_semiRestricted_writes + 1 != addr) {
+            uart_printf("checking proof\n\n");
+		if(restricted_area_end + current_semiRestricted_writes != addr) {
+                        uart_printf("fail\n");
 			expected_semiRestricted_writes = 0;
 			current_semiRestricted_writes = 0;
 			return STATUS_SUCCESS; // TODO: think if this is really all that needs to be done on fail. There is an implicit failsafe... no comm with TEE here.
 		}
 
 
-		
-		int randLen = secretLen * log2((4096 * 8) / secretLen);
-		uint8_t *pageRand = malloc(secretLen * sizeof(uint8_t));
+		int randLen = secretLen * log2((2048 * 8) / secretLen);
+		uint8_t *pageRand = (uint8_t *) malloc(secretLen * sizeof(uint8_t));
+                for(int l = 0; l < secretLen; l++) {
+                  pageRand[l] = 0;
+                }
 
 		int current = 0;
 		int verificationResult = 1;
 		for(int j = 0; j < secretLen; j++) {
-			pageRand[j] = prng_next();
-			int pageIndex = (current + pageRand[j]) / 8;
-			int bitIndex = (current + pageRand[j]) % 8;
+			pageRand[j] = (uint8_t) prng_next();
+                        uart_printf("%d\n", pageRand[j]);
+			int pageIndex = (current + (int) floor(pageRand[j] / 8));
+                        uart_printf("pageIndex: %d\n", pageIndex);
+			int bitIndex = pageRand[j] % 8;
+                        uart_printf("bitIndex: %d\n", bitIndex);
 
 			int proofBit = (current_semiRestricted_writes * secretLen) + j;
-			int proofByteIndex = proofBit / 8;
+                        uart_printf("proofBit: %d\n", proofBit);
+			int proofByteIndex = (int) floor(proofBit / 8);
 			int proofBitIndex = proofBit % 8;
+                        uart_printf("proofbyteIndex: %d\n", proofByteIndex);
+                        uart_printf("proofBitIndex: %d\n", proofBitIndex);
+                        
+                        uart_printf("temp[pageindex]: %d\n",temp[pageIndex]);
+                        uart_printf("proof[proofIndex]: %d\n", proof[proofByteIndex]);
+                        uart_printf("current_semiRestricted_writes: %d\n", current_semiRestricted_writes);
+                        
+                        uart_printf("proof:\n");
+                        for(int i = 0; i < proofLen; i++) {
+                          uart_printf("%x", proof[i]);
+                        }
+                        uart_printf("\n");
+                        
 
-			if(((temp[pageIndex] >> (8 - bitIndex)) & 1) != ((proof[proofByteIndex] >> (8 - proofBitIndex)) & 1)) {
+			if(((temp[pageIndex] >> bitIndex) & 1) != ((proof[proofByteIndex] >> proofBitIndex) & 1)) {
 				// proof failed... reset expected_semiRestricted_writes and current_semiRestricted_writes, etc... other important things (so that further writes are rejected). AND, write signed 0 to location for Enclave to read.
-				expected_semiRestricted_writes = 0;
+				uart_printf("fail2\n");
+                                expected_semiRestricted_writes = 0;
 				current_semiRestricted_writes = 0;
 				verificationResult = 0;
 				uint8_t signedVerificationResult[KEY_SIZE + 1];
@@ -492,6 +539,7 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 				FTL_Write(1000, signedVerificationResult);
 				break;
 			}
+                        current += 2048 / secretLen;
 		}
 		current_semiRestricted_writes++;
 		if(verificationResult == 1) {
@@ -682,7 +730,3 @@ STATUS FTL_Flush() {
 
   return ret;
 }
-
-
-
-

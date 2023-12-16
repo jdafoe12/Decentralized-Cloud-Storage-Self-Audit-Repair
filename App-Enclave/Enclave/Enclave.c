@@ -575,8 +575,8 @@ void ecall_generate_file_parity(int fileNum)
 
 		// Magic Number
 		char *parityIndicator = PARITY_INDICATOR;
-		memcpy(parityData[0],parityIndicator, 7);
-		loc += 6 + 1; // +1 for the null character.
+		memcpy(parityData[0],parityIndicator, 6);
+		loc += 6; // +1 for the null character.
 
 		// Nonce
 		uint8_t nonce[KEY_SIZE];
@@ -591,7 +591,7 @@ void ecall_generate_file_parity(int fileNum)
 		uint8_t groupKey[KEY_SIZE];
 
 		size_t len = KEY_SIZE;
-		hmac_sha1(dh_sharedKey, ECC_PUB_KEY_SIZE, nonce, KEY_SIZE, groupKey, &len);
+		hmac_sha1(dh_sharedKey, KEY_SIZE, nonce, KEY_SIZE, groupKey, &len);
 		ocall_printf("here3", 6,0);
 		// Number of pages
 		int numPages = numParityBlocks * PAGE_PER_BLOCK;
@@ -601,35 +601,65 @@ void ecall_generate_file_parity(int fileNum)
 		int proofLength = (SECRET_LENGTH / 8) * numPages;
 		memcpy(parityData[0] + loc, (uint8_t *) &proofLength, sizeof(int));
 		loc += sizeof(int);
+		ocall_printf("proof Length", 13, 0);
+		ocall_printf((int *) &proofLength, sizeof(int), 2);
+		ocall_printf("secret length", 14, 0);
+		int secretLength = SECRET_LENGTH;
+		ocall_printf((int *) &secretLength, sizeof(int), 2); 
+
 		// Proof
 		// Generate l * log(PAGE_SIZE/l) bit random number for each page, using groupKey.
 		uint8_t secretMessage[(SECRET_LENGTH / 8) * numPages];
+
+		for(int i = 0; i < (SECRET_LENGTH / 8) * numPages; i++) {
+			secretMessage[i] = 0;
+		}
 		
-		prng_init((uint32_t) *groupKey);
+		prng_init((uint32_t) groupKey[0]);
 
 		for(int i = 0; i < numPages; i++) {
 			int randLen = SECRET_LENGTH * log2((PAGE_SIZE * 8) / SECRET_LENGTH);
 			uint8_t pageRands[SECRET_LENGTH];
 
+			int blockNumber = 1 + (int) floor((double) i / PAGE_PER_BLOCK);
+			int page_in_block = i % PAGE_PER_BLOCK;
+
 			int current = 0;
 			for(int j = 0; j < SECRET_LENGTH; j++) {
-				pageRands[j] = prng_next();
+				pageRands[j] = (uint8_t) prng_next();
+				ocall_printf(pageRands + j, sizeof(uint8_t), 2);
 
-				int pageIndex = (current + pageRands[j]) / 8;
-        		int bitIndex = (current + pageRands[j]) % 8;
+				int pageIndex = (current + (int) floor(pageRands[j] / 8));
+        		int bitIndex = pageRands[j] % 8;
 				// add the (current + pageRands[j])th bit in current page to secret_Message, from parityData.
-				secretMessage[i * (SECRET_LENGTH / 8) + j / 8] |= ((parityData[(int) floor((double) i / PAGE_PER_BLOCK)][pageIndex + ((i % (PAGE_PER_BLOCK)) * PAGE_SIZE)] >> bitIndex) & 1) << (j % 8);
+				int messageBit = (i * SECRET_LENGTH) + j;
+				int messageByte = (int) floor(messageBit / 8);
+				int messageBitIndex = messageBit % 8;
 
-				current += proofLength;
+
+				ocall_printf("parityD:", 9, 0);
+				ocall_printf(parityData[blockNumber] + (pageIndex + (page_in_block * PAGE_SIZE)), 1, 2);
+
+				secretMessage[messageByte] |= (((parityData[blockNumber][pageIndex + (page_in_block * PAGE_SIZE)] >> (bitIndex)) & 1) << messageBitIndex);
+
+				if(((parityData[blockNumber][pageIndex + (page_in_block * PAGE_SIZE)] >> bitIndex) & 1) != ((secretMessage[messageByte] >> messageBitIndex) & 1)) {
+					ocall_printf("WHY IT DO THIS?", 16, 0);
+				}
+
+				current += 2048 / SECRET_LENGTH;
 			}
 		}
-		ocall_printf("here2", 6,0);
+		ocall_printf("proof:", 7,0);
+
+		ocall_printf(secretMessage,  (SECRET_LENGTH / 8) * numPages, 1);
 
 		memcpy(parityData[0] + loc, secretMessage, (SECRET_LENGTH / 8) * numPages);
 		loc += (SECRET_LENGTH / 8) * numPages;
 
 		// Signature
 		uint8_t signature[KEY_SIZE];
+		ocall_printf("group key", 10, 0);
+		ocall_printf(groupKey, KEY_SIZE, 1);
 		hmac_sha1(groupKey, KEY_SIZE, parityData[0], loc, signature, &len);
 		memcpy(parityData[0] + loc, signature, KEY_SIZE);
 		loc += KEY_SIZE;
@@ -654,6 +684,7 @@ void ecall_generate_file_parity(int fileNum)
     }
 
 	// read from page 1000 and verify proof verification || signature (it uses groupKey).
+	
 
     ocall_init_parity(numBits);
 }
