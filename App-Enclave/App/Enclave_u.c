@@ -159,6 +159,13 @@ static sgx_status_t SGX_CDECL Enclave_ocall_send_parity(void* pms)
 	return SGX_SUCCESS;
 }
 
+static sgx_status_t SGX_CDECL Enclave_ocall_end_genPar(void* pms)
+{
+	if (pms != NULL) return SGX_ERROR_INVALID_PARAMETER;
+	ocall_end_genPar();
+	return SGX_SUCCESS;
+}
+
 static sgx_status_t SGX_CDECL Enclave_sgx_oc_cpuidex(void* pms)
 {
 	ms_sgx_oc_cpuidex_t* ms = SGX_CAST(ms_sgx_oc_cpuidex_t*, pms);
@@ -225,9 +232,9 @@ static sgx_status_t SGX_CDECL Enclave_pthread_wakeup_ocall(void* pms)
 
 static const struct {
 	size_t nr_ocall;
-	void * table[15];
+	void * table[16];
 } ocall_table_Enclave = {
-	15,
+	16,
 	{
 		(void*)Enclave_ocall_ftl_init,
 		(void*)Enclave_ocall_get_block,
@@ -236,6 +243,7 @@ static const struct {
 		(void*)Enclave_ocall_get_segment,
 		(void*)Enclave_ocall_init_parity,
 		(void*)Enclave_ocall_send_parity,
+		(void*)Enclave_ocall_end_genPar,
 		(void*)Enclave_sgx_oc_cpuidex,
 		(void*)Enclave_sgx_thread_wait_untrusted_event_ocall,
 		(void*)Enclave_sgx_thread_set_untrusted_event_ocall,

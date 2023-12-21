@@ -28,6 +28,7 @@ sgx_status_t SGX_CDECL ocall_send_nonce(uint8_t* nonce);
 sgx_status_t SGX_CDECL ocall_get_segment(const char* fileName, int segNum, uint8_t* segData);
 sgx_status_t SGX_CDECL ocall_init_parity(int numBits);
 sgx_status_t SGX_CDECL ocall_send_parity(int startPage, uint8_t* parityData, size_t size);
+sgx_status_t SGX_CDECL ocall_end_genPar(void);
 sgx_status_t SGX_CDECL sgx_oc_cpuidex(int cpuinfo[4], int leaf, int subleaf);
 sgx_status_t SGX_CDECL sgx_thread_wait_untrusted_event_ocall(int* retval, const void* self);
 sgx_status_t SGX_CDECL sgx_thread_set_untrusted_event_ocall(int* retval, const void* waiter);

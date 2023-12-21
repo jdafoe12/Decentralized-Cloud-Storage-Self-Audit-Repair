@@ -293,7 +293,7 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
    * 237850 (951400) - Set genPar to 1 or 0. Set numBits to correct number.
    */
  
-  if(addr == 237846) {
+  if(addr == 237846) { // 951384
 	read_state = 1;
 	gen_par = 0;
 	uart_printf("Read state 1\n");
@@ -474,8 +474,9 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 				current_semiRestricted_writes = 0;
 				verificationResult = 0;
 				uint8_t signedVerificationResult[KEY_SIZE + 1];
-				hmac_sha1(tempKey, KEY_SIZE, signedVerificationResult, sizeof(int), signedVerificationResult + 1, &keySize);
-				signedVerificationResult[0] = verificationResult;
+        signedVerificationResult[0] = verificationResult;
+				hmac_sha1(tempKey, KEY_SIZE, signedVerificationResult, sizeof(uint8_t), signedVerificationResult + 1, &keySize);
+				
 				FTL_Write(1000, signedVerificationResult);
 				break;
 			}
@@ -486,11 +487,12 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 			if(current_semiRestricted_writes == expected_semiRestricted_writes) {
 				// proof success. Write signed 1 to location for Enclave to read. Reset essential viriables.
 				uint8_t signedVerificationResult[KEY_SIZE + 1];
+        signedVerificationResult[0] = verificationResult;
 				restricted_area_end += expected_semiRestricted_writes;
 				expected_semiRestricted_writes = 0;
 				current_semiRestricted_writes = 0;
-				hmac_sha1(tempKey, KEY_SIZE, signedVerificationResult, sizeof(int), signedVerificationResult + 1, &keySize);
-				signedVerificationResult[0] = verificationResult;
+				hmac_sha1(tempKey, KEY_SIZE, signedVerificationResult, sizeof(uint8_t), signedVerificationResult + 1, &keySize);
+
 				uart_printf("verification result: %d\n", verificationResult);
 				FTL_Write(1000, signedVerificationResult);
 			}

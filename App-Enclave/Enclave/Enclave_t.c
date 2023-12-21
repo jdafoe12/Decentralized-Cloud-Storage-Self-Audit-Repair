@@ -350,10 +350,11 @@ SGX_EXTERNC const struct {
 
 SGX_EXTERNC const struct {
 	size_t nr_ocall;
-	uint8_t entry_table[15][4];
+	uint8_t entry_table[16][4];
 } g_dyn_entry_table = {
-	15,
+	16,
 	{
+		{0, 0, 0, 0, },
 		{0, 0, 0, 0, },
 		{0, 0, 0, 0, },
 		{0, 0, 0, 0, },
@@ -834,6 +835,13 @@ sgx_status_t SGX_CDECL ocall_send_parity(int startPage, uint8_t* parityData, siz
 	return status;
 }
 
+sgx_status_t SGX_CDECL ocall_end_genPar(void)
+{
+	sgx_status_t status = SGX_SUCCESS;
+	status = sgx_ocall(7, NULL);
+
+	return status;
+}
 sgx_status_t SGX_CDECL sgx_oc_cpuidex(int cpuinfo[4], int leaf, int subleaf)
 {
 	sgx_status_t status = SGX_SUCCESS;
@@ -886,7 +894,7 @@ sgx_status_t SGX_CDECL sgx_oc_cpuidex(int cpuinfo[4], int leaf, int subleaf)
 		return SGX_ERROR_UNEXPECTED;
 	}
 
-	status = sgx_ocall(7, ms);
+	status = sgx_ocall(8, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (cpuinfo) {
@@ -923,7 +931,7 @@ sgx_status_t SGX_CDECL sgx_thread_wait_untrusted_event_ocall(int* retval, const 
 		return SGX_ERROR_UNEXPECTED;
 	}
 
-	status = sgx_ocall(8, ms);
+	status = sgx_ocall(9, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (retval) {
@@ -960,7 +968,7 @@ sgx_status_t SGX_CDECL sgx_thread_set_untrusted_event_ocall(int* retval, const v
 		return SGX_ERROR_UNEXPECTED;
 	}
 
-	status = sgx_ocall(9, ms);
+	status = sgx_ocall(10, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (retval) {
@@ -1002,7 +1010,7 @@ sgx_status_t SGX_CDECL sgx_thread_setwait_untrusted_events_ocall(int* retval, co
 		return SGX_ERROR_UNEXPECTED;
 	}
 
-	status = sgx_ocall(10, ms);
+	status = sgx_ocall(11, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (retval) {
@@ -1064,7 +1072,7 @@ sgx_status_t SGX_CDECL sgx_thread_set_multiple_untrusted_events_ocall(int* retva
 		return SGX_ERROR_UNEXPECTED;
 	}
 
-	status = sgx_ocall(11, ms);
+	status = sgx_ocall(12, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (retval) {
@@ -1106,7 +1114,7 @@ sgx_status_t SGX_CDECL pthread_wait_timeout_ocall(int* retval, unsigned long lon
 		return SGX_ERROR_UNEXPECTED;
 	}
 
-	status = sgx_ocall(12, ms);
+	status = sgx_ocall(13, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (retval) {
@@ -1143,7 +1151,7 @@ sgx_status_t SGX_CDECL pthread_create_ocall(int* retval, unsigned long long self
 		return SGX_ERROR_UNEXPECTED;
 	}
 
-	status = sgx_ocall(13, ms);
+	status = sgx_ocall(14, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (retval) {
@@ -1180,7 +1188,7 @@ sgx_status_t SGX_CDECL pthread_wakeup_ocall(int* retval, unsigned long long wait
 		return SGX_ERROR_UNEXPECTED;
 	}
 
-	status = sgx_ocall(14, ms);
+	status = sgx_ocall(15, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (retval) {

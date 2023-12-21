@@ -527,6 +527,39 @@ void receive_parity(int server_fd) {
  close(fd);
 }
 
+void end_genPar(int server_fd) {
+ int client_fd;
+
+ int fd;
+ if ((fd = open(PATH, O_RDWR | O_DIRECT)) == -1) {
+ perror("[open]");
+ return;
+ }
+
+ off_t offset = 951384 * SEGMENT_SIZE; /* Segment offset */
+ void *buf;
+ if (posix_memalign(&buf, SEGMENT_SIZE, SEGMENT_SIZE) != 0) {
+ perror("[posix_memalign]");
+ close(fd);
+ return;
+ }
+
+ /* Write segNum to address 951396 */
+ if (lseek(fd, offset, SEEK_SET) == -1) {
+ perror("[lseek]");
+ close(fd);
+ return;
+ }
+ int temp = 0;
+ memcpy(buf, &temp, sizeof(temp));
+ if (write(fd, buf, SEGMENT_SIZE) == -1) {
+ perror("[write]");
+ close(fd);
+ return;
+ }
+ 
+}
+
 
 main() 
 {
@@ -567,6 +600,10 @@ main()
  // State transitions need to be better defined in FTL, in general.
  printf("enter state 2\n");
  state_2(server_fd);
+ }
+ else if(strcmp(command, "end_genPar") == 0) {
+    printf("end genpar\n");
+    end_genPar(server_fd);
  }
  else exit(1);
  }

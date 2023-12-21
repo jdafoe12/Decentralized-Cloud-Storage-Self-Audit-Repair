@@ -45,6 +45,10 @@ void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_init_parity, (int numBits));
 #define OCALL_SEND_PARITY_DEFINED__
 void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_send_parity, (int startPage, uint8_t* parityData, size_t size));
 #endif
+#ifndef OCALL_END_GENPAR_DEFINED__
+#define OCALL_END_GENPAR_DEFINED__
+void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_end_genPar, (void));
+#endif
 #ifndef SGX_OC_CPUIDEX_DEFINED__
 #define SGX_OC_CPUIDEX_DEFINED__
 void SGX_UBRIDGE(SGX_CDECL, sgx_oc_cpuidex, (int cpuinfo[4], int leaf, int subleaf));

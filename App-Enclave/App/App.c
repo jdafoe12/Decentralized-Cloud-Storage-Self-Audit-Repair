@@ -35,6 +35,11 @@ void ocall_init_parity(int numBits)
 	send_data_to_server(&numBits, sizeof(int)); // TODO: write response on server side in VM.
 }
 
+void ocall_end_genPar() 
+{
+	send_data_to_server("end_genPar", 11);
+}
+
 
 
 /*
@@ -47,11 +52,11 @@ void ocall_send_nonce(uint8_t *nonce)
 {
 
 
-	/* Call server function get_challnum*/
+	/* Call server function get_nonce*/
 	send_data_to_server("get_nonce", 12); // TODO: Change this on server side to nonce.
 
-	/* Send challnum to server */
-	send_data_to_server(&nonce, sizeof(uint8_t) * KEY_SIZE);
+	/* Send nonce to server */
+	send_data_to_server(nonce, sizeof(uint8_t) * KEY_SIZE);
 }
 
 void ocall_get_segment(const char *fileName, int segNum, uint8_t *segData) 
