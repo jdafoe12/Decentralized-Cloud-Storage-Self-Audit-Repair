@@ -150,7 +150,7 @@ void get_segment(int server_fd)
  client_fd = accept_connection(server_fd);
  read(client_fd, &segNum, sizeof(int));
  close(client_fd);
- printf("Segment number recieved: %d\n", segNum);
+ //printf("Segment number recieved: %d\n", segNum);
  /* Open device */
  int fd;
  if ((fd = open(PATH, O_RDWR | O_DIRECT)) == -1) {
@@ -426,7 +426,7 @@ void state_2(int server_fd)
 }
 
 void receive_parity(int server_fd) {
- printf("here?\n");
+ //printf("here?\n");
 
  // Open storage device. ASSUME 1 File for now
  int fd;
@@ -466,8 +466,8 @@ void receive_parity(int server_fd) {
  }
  close(client_fd);
 
- printf("start page: %d\n", startPage);
- printf("size: %zu\n", size);
+ //printf("start page: %d\n", startPage);
+ //printf("size: %zu\n", size);
 
  // Receive page into buffer
  client_fd = accept_connection(server_fd);
