@@ -575,7 +575,7 @@ void write_partition(int server_fd) {
  return;
  }
 
- off_t offset = 951404 * SEGMENT_SIZE; /* Segment offset */
+ off_t offset = 951384 * SEGMENT_SIZE; /* Segment offset */
  void *buf;
  if (posix_memalign(&buf, SEGMENT_SIZE, SEGMENT_SIZE) != 0) {
  perror("[posix_memalign]");
@@ -584,7 +584,7 @@ void write_partition(int server_fd) {
  }
 
  /* Write segNum to address 951396 */
- if (lseek(fd, 951404 * SEGMENT_SIZE, SEEK_SET) == -1) {
+ if (lseek(fd, 951384 * SEGMENT_SIZE, SEEK_SET) == -1) {
  perror("[lseek]");
  close(fd);
  return;

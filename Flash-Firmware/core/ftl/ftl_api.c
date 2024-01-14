@@ -81,6 +81,7 @@ static int current_semiRestricted_writes = 0;
 static int secretLen = 0;
 static int proofLen = 0;
 static uint8_t *proof = NULL;
+static int writePar = 0;
 //int read_loops;
 // end Jdafoe
 
@@ -189,6 +190,28 @@ int EncryptData(uint32_t* KEY,void* buffer, int dataLen)
     }
   return 0;
 }
+
+int DecryptData(uint32_t* KEY,void* buffer, int dataLen)
+{
+   //decrypt after read
+    AesCtx ctx;
+    unsigned char iv[] = "1234"; // Needs to be same between FTL and SGX
+    unsigned char key[16];
+    uint8_t i;
+    for(i=0;i<4;i++){    
+    	key[4*i]=(*(KEY+i))/NUM1;
+    	key[(4*i)+1]=((*(KEY+i))/NUM2)%NUM3;
+    	key[(4*i)+2]=(*(KEY+i)% NUM2)/NUM3;
+    	key[(4*i)+3]=(*(KEY+i)% NUM2)%NUM3;
+    }
+    
+   if( AesCtxIni(&ctx, iv, key, KEY128, EBC) < 0) return -1;
+
+   if (AesDecrypt(&ctx, (unsigned char *)buffer, (unsigned char *)buffer, dataLen) < 0) return -1;
+
+   return 0;
+}
+
 // end Niusen
 // end Jdafoe
 
@@ -294,11 +317,14 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
    */
  
   if(addr == 237846) { // 951384
-	read_state = 1;
-	gen_par = 0;
-	uart_printf("Read state 1\n");
-	uart_printf("gen_par 0\n");
-	page_inx = temp[0] % 4;
+    if(!writePar) {
+      writePar = 1;
+      uint8_t *temp = buffer;
+      numBits = temp[0];
+    }
+    else {
+      writePar = 0;
+    }
 
   }
 
@@ -508,6 +534,15 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 
 	  // If not first semi-restricted write, then progressively check proof.
 	  // If final semi-restricted write, then increase restricted_area_end only if proof passed, and regardless, write signed proof verification results to a certain address, which should be read by the Enclave.
+  }
+
+  if(writePar == 1) {
+    uint8_t *temp = buffer;
+    for(int i = 0; i < 4; i++) {
+      DecryptData((UINT32 *)tempKey, temp + (512 * i), 512);
+    }
+    addr = feistel_network_prp(tempKey, addr, numBits);
+
   }
   
   // end Jdafoe
