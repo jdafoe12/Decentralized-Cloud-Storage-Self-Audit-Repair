@@ -561,7 +561,104 @@ void end_genPar(int server_fd) {
 }
 
 void write_partition(int server_fd) {
-   
+ int client_fd;
+
+ int numBits = 0;
+
+ client_fd = accept_connection(server_fd);
+ int len = read(client_fd, &numBits, sizeof(int));
+ close(client_fd);
+
+ int fd;
+ if ((fd = open(PATH, O_RDWR | O_DIRECT)) == -1) {
+ perror("[open]");
+ return;
+ }
+
+ off_t offset = 951404 * SEGMENT_SIZE; /* Segment offset */
+ void *buf;
+ if (posix_memalign(&buf, SEGMENT_SIZE, SEGMENT_SIZE) != 0) {
+ perror("[posix_memalign]");
+ close(fd);
+ return;
+ }
+
+ /* Write segNum to address 951396 */
+ if (lseek(fd, 951404 * SEGMENT_SIZE, SEEK_SET) == -1) {
+ perror("[lseek]");
+ close(fd);
+ return;
+ }
+
+ memcpy(buf, &numBits, sizeof(numBits));
+ if (write(fd, buf, SEGMENT_SIZE) == -1) {
+ perror("[write]");
+ close(fd);
+ return;
+ }
+
+}
+
+void write_page(int server_fd) {
+    int fd;
+ if ((fd = open(PATH, O_RDWR | O_DIRECT)) == -1) {
+ perror("[open]");
+ return;
+ }
+
+ // Align buffer to 2048 bytes
+ uint8_t *buffer;
+ if (posix_memalign((void **)&buffer, 2048, 2048) != 0) {
+ perror("[posix_memalign]");
+ close(fd);
+ return;
+ }
+
+ // Receive startPage
+ int pageNum = 0;
+ int client_fd = accept_connection(server_fd);
+ if (read(client_fd, &pageNum, sizeof(pageNum)) != sizeof(pageNum)) {
+ perror("[read startPage]");
+ free(buffer);
+ close(client_fd);
+ close(fd);
+ return;
+ }
+ close(client_fd);
+
+ //printf("start page: %d\n", startPage);
+ //printf("size: %zu\n", size);
+
+ // Receive page into buffer
+ client_fd = accept_connection(server_fd);
+ int bytes_received = 0;
+ while (bytes_received < 2048) {
+ int bytes_read = read(client_fd, buffer + bytes_received, 2048 - bytes_received);
+ if (bytes_read <= 0) {
+ perror("[read page]");
+ free(buffer);
+ close(client_fd);
+ close(fd);
+ return;
+ }
+ bytes_received += bytes_read;
+ }
+ close(client_fd);
+
+ if (lseek(fd, (pageNum) * 2048, SEEK_SET) == -1) {
+ perror("[lseek]");
+ free(buffer);
+ close(fd);
+ return;
+ }
+
+ if (write(fd, buffer, 2048) == -1) {
+ perror("[write]");
+ free(buffer);
+ close(fd);
+ return;
+ }
+ fdatasync(fd);
 
 }
 
@@ -613,6 +710,10 @@ main()
  else if(strcmp(command, "write_partition") == 0) {
    printf("write_partition");
    write_partition(server_fd);
+ }
+ else if(strcmp(command, "write_page") == 0) {
+   printf("write_page");
+   write_page(server_fd);
  }
  else exit(1);
  }

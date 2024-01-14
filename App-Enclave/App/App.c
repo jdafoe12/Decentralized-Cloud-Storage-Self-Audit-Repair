@@ -38,7 +38,7 @@ void ocall_init_parity(int numBits)
 void ocall_write_partition(int numBits)
 {
     send_data_to_server("write_partition", 16);
-    send_data_to_server(&numBits,, sizeof(int));
+    send_data_to_server(&numBits, sizeof(int));
 }
 
 void ocall_write_page(int pageNum, uint8_t *pageData) 
