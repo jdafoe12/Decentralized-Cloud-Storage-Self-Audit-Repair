@@ -35,6 +35,19 @@ void ocall_init_parity(int numBits)
 	send_data_to_server(&numBits, sizeof(int)); // TODO: write response on server side in VM.
 }
 
+void ocall_write_partition(int numBits)
+{
+    send_data_to_server("write_partition", 16);
+    send_data_to_server(&numBits,, sizeof(int));
+}
+
+void ocall_write_page(int pageNum, uint8_t *pageData) 
+{
+    send_data_to_server("write_page", 11);
+    send_data_to_server(&pageNum, sizeof(int));
+    send_data_to_server(pageData, sizeof(uint8_t) * PAGE_SIZE);
+}
+
 void ocall_end_genPar() 
 {
 	send_data_to_server("end_genPar", 11);
@@ -59,7 +72,7 @@ void ocall_send_nonce(uint8_t *nonce)
 	send_data_to_server(nonce, sizeof(uint8_t) * KEY_SIZE);
 }
 
-void ocall_get_segment(const char *fileName, int segNum, uint8_t *segData) 
+void ocall_get_segment(const char *fileName, int segNum, uint8_t *segData) //TODO: make it clear when pages vs segments need to be read.
 {
 
     /* Call server function get_segment */

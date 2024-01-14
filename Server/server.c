@@ -560,6 +560,11 @@ void end_genPar(int server_fd) {
  
 }
 
+void write_partition(int server_fd) {
+   
+
+}
+
 
 main() 
 {
@@ -604,6 +609,10 @@ main()
  else if(strcmp(command, "end_genPar") == 0) {
     printf("end genpar\n");
     end_genPar(server_fd);
+ }
+ else if(strcmp(command, "write_partition") == 0) {
+   printf("write_partition");
+   write_partition(server_fd);
  }
  else exit(1);
  }

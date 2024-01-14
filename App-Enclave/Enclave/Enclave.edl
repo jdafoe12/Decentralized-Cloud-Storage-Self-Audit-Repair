@@ -12,6 +12,7 @@ enclave {
 		public int ecall_file_init([in, string] const char *fileName,[out] Tag *tag,[out, size=10, count=10] uint8_t *sigma, int numBlocks);
 		public void ecall_audit_file([in, string] const char *fileName,[out] int *ret);
 		public void ecall_generate_file_parity(int fileNum);
+		public void ecall_decode_partition([in, string] const char *fileName, int blockNum);
 	};
 
 	untrusted {
@@ -33,6 +34,10 @@ enclave {
 		void ocall_send_parity(int startPage, [in, size=size] uint8_t *parityData, size_t size);
 
 		void ocall_end_genPar();
+
+		void ocall_write_partition(int numBits);
+
+		void ocall_write_page(int pageNum, [in, size=2048] uint8_t *pageData);
 
 	};
 };

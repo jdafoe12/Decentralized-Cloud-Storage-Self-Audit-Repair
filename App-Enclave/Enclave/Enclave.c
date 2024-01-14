@@ -112,6 +112,66 @@ int DecryptData(uint32_t* KEY,void* buffer, int dataLen)
    return 0;
 }
 
+int EncryptData(uint32_t* KEY,void* buffer, int dataLen)
+{
+    //encrypt before writing
+    AesCtx ctx;
+    unsigned char iv[] = "1234";
+    //unsigned char key[] = "876543218765432";
+    unsigned char key[16];    
+    uint8_t i;
+    for(i=0;i<4;i++){    
+     key[4*i]=(*(KEY+i))/NUM1;
+     key[(4*i)+1]=((*(KEY+i))/NUM2)%NUM3;
+     key[(4*i)+2]=(*(KEY+i)% NUM2)/NUM3;
+     key[(4*i)+3]=(*(KEY+i)% NUM2)%NUM3;
+    }
+    for(i=0;i<16;i++){ 
+     // uart_printf("EncryptData():the %d byte of key is %x\n\r",i,key[i]); 
+    }
+    
+    //uart_printf("before encrypt: %s\n\r", buffer);
+    
+   // initialize context and encrypt data at one end    
+    if( AesCtxIni(&ctx, iv, key, KEY128, EBC) < 0)
+        //uart_printf("init error\n");
+    
+    int flag = 0;
+    if ((flag = AesEncrypt(&ctx, (unsigned char *)buffer, (unsigned char *)buffer, dataLen)) < 0) 
+      // dataLen needs to be different based on PDP vs ECC. Full 512 byte segment for ECC. KEY_SIZE for PDP.
+    {
+       //uart_printf("error in encryption\n");
+       if(flag == -2)
+      {
+        //uart_printf("Data is empty");
+        //return -2;
+      }
+      else if(flag == -3)
+      {
+        //uart_printf("cipher is empty");
+      //return -3;
+      }
+      else if(flag == -4)
+      {
+        //uart_printf("context is empty");
+       // return -4;
+      }
+      else if(flag == -5)
+      {
+        //uart_printf("data length is not a multiple of 16");
+      //return -5;
+      }
+      else
+      {
+        //uart_printf("other error");
+      }    
+    }else{
+      //uart_printf("encryption ok %d\n\r",count_write);
+      //uart_printf("after encrypt: %s\n\r", buffer);      
+    }
+  return 0;
+}
+
 // Uses repeated calls to ocall_printf, to print arbitrarily sized bignums
 void printBN(BIGNUM *bn, int size) 
 {
@@ -965,6 +1025,26 @@ void ecall_decode_partition(const char *fileName, int blockNum)
 	// TODO: make procedures be pretty much same as in paper?
 	// TODO: add this ecall to enclave.edl
 
+	ocall_write_partition(numBits);
+
+	for(int i = 0; i < maxBlocksPerGroup; i++) {
+
+		if (groups[group][groupBlock] == -1) { // This group is not full (it has less than maxBlocksPerGroup blocks). 
+			continue; // TODO: why continue here? shouldn't it break or somethn
+		}
+
+		blockNum = groups[groupNum][i];
+
+		for(int j = 0; j < PAGE_PER_BLOCK; j++) {
+			int pageNum = (blockNum * PAGE_PER_BLOCK) + j;
+			pageNum = feistel_network_prp(sharedKey, pageNum, numBits);
+			for(int k = 0; k < SEGMENT_PER_PAGE; k++) {
+				EncryptData((uint32_t *)sharedKey, groupData + ((i* BLOCK_SIZE) + (j * PAGE_SIZE) + (k + SEGMENT_SIZE)), SEGMENT_SIZE);
+			}
+			ocall_write_page();
+		}
+	}
+	ocall_write_partition(numBits);
 
 
 }
