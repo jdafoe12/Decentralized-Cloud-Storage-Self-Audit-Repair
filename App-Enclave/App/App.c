@@ -405,6 +405,9 @@ int main(void)
     //cpu_time_used = (end_time.tv_sec - start_time.tv_sec) + (end_time.tv_usec - start_time.tv_usec) / 1000000.0;
     //printf("AUDIT TIME: %f with %d wait Time\n", cpu_time_used, waittime);
 
+    printf("Call decode partition\n");
+    ecall_decode_partition(eid, fileName, 3);
+
     if(status == 0) {
         printf("SUCCESS!!!\n");
     }

@@ -20,6 +20,7 @@ void ecall_init(void);
 int ecall_file_init(const char* fileName, Tag* tag, uint8_t* sigma, int numBlocks);
 void ecall_audit_file(const char* fileName, int* ret);
 void ecall_generate_file_parity(int fileNum);
+void ecall_decode_partition(const char* fileName, int blockNum);
 
 sgx_status_t SGX_CDECL ocall_ftl_init(uint8_t* sgx_pubKey, uint8_t* ftl_pubKey);
 sgx_status_t SGX_CDECL ocall_get_block(uint8_t* data, size_t segSize, int segPerBlock, int blockNum, char* fileName);
@@ -29,6 +30,8 @@ sgx_status_t SGX_CDECL ocall_get_segment(const char* fileName, int segNum, uint8
 sgx_status_t SGX_CDECL ocall_init_parity(int numBits);
 sgx_status_t SGX_CDECL ocall_send_parity(int startPage, uint8_t* parityData, size_t size);
 sgx_status_t SGX_CDECL ocall_end_genPar(void);
+sgx_status_t SGX_CDECL ocall_write_partition(int numBits);
+sgx_status_t SGX_CDECL ocall_write_page(int pageNum, uint8_t* pageData);
 sgx_status_t SGX_CDECL sgx_oc_cpuidex(int cpuinfo[4], int leaf, int subleaf);
 sgx_status_t SGX_CDECL sgx_thread_wait_untrusted_event_ocall(int* retval, const void* self);
 sgx_status_t SGX_CDECL sgx_thread_set_untrusted_event_ocall(int* retval, const void* waiter);

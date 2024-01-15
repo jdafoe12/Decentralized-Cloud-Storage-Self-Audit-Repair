@@ -133,8 +133,10 @@ int EncryptData(uint32_t* KEY,void* buffer, int dataLen)
     //uart_printf("before encrypt: %s\n\r", buffer);
     
    // initialize context and encrypt data at one end    
-    if( AesCtxIni(&ctx, iv, key, KEY128, EBC) < 0)
+    if( AesCtxIni(&ctx, iv, key, KEY128, EBC) < 0) {
         //uart_printf("init error\n");
+	}
+
     
     int flag = 0;
     if ((flag = AesEncrypt(&ctx, (unsigned char *)buffer, (unsigned char *)buffer, dataLen)) < 0) 
@@ -807,7 +809,7 @@ void ecall_decode_partition(const char *fileName, int blockNum)
 
 	int fileNum;
 	for(fileNum = 0; fileNum < MAX_FILES; fileNum++) {
-		if(strcmp(fileName, files[i].fileName) == 0) {
+		if(strcmp(fileName, files[fileNum].fileName) == 0) {
 			break;
 		}
 	}
@@ -826,7 +828,7 @@ void ecall_decode_partition(const char *fileName, int blockNum)
 
     uint64_t **groups = get_groups(files[fileNum].sortKey, numBlocks, numGroups);
 
-    int blockNum = 0;
+    int currBlockNum = 0;
     int pageNum = 0;
     int permutedPageNum = 0;
     int segNum = 0;
@@ -836,7 +838,7 @@ void ecall_decode_partition(const char *fileName, int blockNum)
 	int groupNum;
 	for(int i = 0; i < numGroups; i++) {
         for(int j = 0; j < maxBlocksPerGroup; j++) {
-            if(groups[i][j] == blockNumber) {
+            if(groups[i][j] == blockNum) {
                 groupNum = i; // Returns the group number if the block number is found
             }
         }
@@ -875,18 +877,18 @@ void ecall_decode_partition(const char *fileName, int blockNum)
 
 
 	for (int groupBlock = 0; groupBlock < maxBlocksPerGroup; groupBlock++) { 
-		blockNum = groups[group][groupBlock];
+		currBlockNum = groups[groupNum][groupBlock];
 		// JD_TEST
 		//ocall_printf("block number:", 14,0);
 		//ocall_printf((uint8_t *)&blockNum, sizeof(uint8_t), 2);
 		// END JD_TEST
-		if (groups[group][groupBlock] == -1) { // This group is not full (it has less than maxBlocksPerGroup blocks). 
+		if (groups[groupNum][groupBlock] == -1) { // This group is not full (it has less than maxBlocksPerGroup blocks). 
 			continue; // TODO: why continue here? shouldn't it break or somethn
 		}
 		blocksInGroup++;
 
 		for (int blockPage = 0; blockPage < PAGE_PER_BLOCK; blockPage++) {
-			pageNum = (blockNum * PAGE_PER_BLOCK) + blockPage;
+			pageNum = (currBlockNum * PAGE_PER_BLOCK) + blockPage;
 
 			permutedPageNum = feistel_network_prp(sharedKey, pageNum, numBits);
 			// JD_TEST
@@ -956,8 +958,8 @@ void ecall_decode_partition(const char *fileName, int blockNum)
 	}
 
 	uint8_t* parityData = (uint8_t*)malloc(numParityBlocks * BLOCK_SIZE);
-	for(int i = 0; i < numParityBlock * SEGMENT_PER_BLOCK; i++) {
-		ocall_get_segment(fileName, PARITY_START + startpage + i, data + (i * SEGMENT_SIZE))
+	for(int i = 0; i < numParityBlocks * SEGMENT_PER_BLOCK; i++) {
+		ocall_get_segment(fileName, PARITY_START + startPage + i, parityData + (i * SEGMENT_SIZE));
 	}
 
 	// Read and decrypt parity data.
@@ -973,10 +975,10 @@ void ecall_decode_partition(const char *fileName, int blockNum)
 		return;
 	}
 
-	for(int i = 0; i < numParityBlock; i++) {
+	for(int i = 0; i < numParityBlocks; i++) {
 		int out_len;
 
-		if (!EVP_DecryptUpdate(ctx, parityData + (i * SEGMENT_SIZE), &out_len, tempParityData + (i * BLOCK_SIZE), BLOCK_SIZE)) {
+		if (!EVP_DecryptUpdate(ctx, parityData + (i * SEGMENT_SIZE), &out_len, parityData + (i * BLOCK_SIZE), BLOCK_SIZE)) {
 			// Handle error: Encryption Update failed
 			EVP_CIPHER_CTX_free(ctx);
 			return;
@@ -1029,19 +1031,19 @@ void ecall_decode_partition(const char *fileName, int blockNum)
 
 	for(int i = 0; i < maxBlocksPerGroup; i++) {
 
-		if (groups[group][groupBlock] == -1) { // This group is not full (it has less than maxBlocksPerGroup blocks). 
+		if (groups[groupNum][i] == -1) { // This group is not full (it has less than maxBlocksPerGroup blocks). 
 			continue; // TODO: why continue here? shouldn't it break or somethn
 		}
 
-		blockNum = groups[groupNum][i];
+		currBlockNum = groups[groupNum][i];
 
 		for(int j = 0; j < PAGE_PER_BLOCK; j++) {
-			int pageNum = (blockNum * PAGE_PER_BLOCK) + j;
+			int pageNum = (currBlockNum * PAGE_PER_BLOCK) + j;
 			pageNum = feistel_network_prp(sharedKey, pageNum, numBits);
 			for(int k = 0; k < SEGMENT_PER_PAGE; k++) {
-				EncryptData((uint32_t *)sharedKey, groupData + ((i* BLOCK_SIZE) + (j * PAGE_SIZE) + (k + SEGMENT_SIZE)), SEGMENT_SIZE);
+				EncryptData((uint32_t *)sharedKey, groupData + ((i* BLOCK_SIZE) + (j * PAGE_SIZE) + (k * SEGMENT_SIZE)), SEGMENT_SIZE);
 			}
-			ocall_write_page();
+			ocall_write_page(pageNum, groupData + (i * BLOCK_SIZE) + (j * PAGE_SIZE));
 		}
 	}
 	ocall_write_partition(numBits);

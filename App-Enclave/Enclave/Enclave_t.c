@@ -46,6 +46,12 @@ typedef struct ms_ecall_generate_file_parity_t {
 	int ms_fileNum;
 } ms_ecall_generate_file_parity_t;
 
+typedef struct ms_ecall_decode_partition_t {
+	const char* ms_fileName;
+	size_t ms_fileName_len;
+	int ms_blockNum;
+} ms_ecall_decode_partition_t;
+
 typedef struct ms_ocall_ftl_init_t {
 	uint8_t* ms_sgx_pubKey;
 	uint8_t* ms_ftl_pubKey;
@@ -84,6 +90,15 @@ typedef struct ms_ocall_send_parity_t {
 	uint8_t* ms_parityData;
 	size_t ms_size;
 } ms_ocall_send_parity_t;
+
+typedef struct ms_ocall_write_partition_t {
+	int ms_numBits;
+} ms_ocall_write_partition_t;
+
+typedef struct ms_ocall_write_page_t {
+	int ms_pageNum;
+	uint8_t* ms_pageData;
+} ms_ocall_write_page_t;
 
 typedef struct ms_sgx_oc_cpuidex_t {
 	int* ms_cpuinfo;
@@ -335,41 +350,94 @@ static sgx_status_t SGX_CDECL sgx_ecall_generate_file_parity(void* pms)
 	return status;
 }
 
+static sgx_status_t SGX_CDECL sgx_ecall_decode_partition(void* pms)
+{
+	CHECK_REF_POINTER(pms, sizeof(ms_ecall_decode_partition_t));
+	//
+	// fence after pointer checks
+	//
+	sgx_lfence();
+	ms_ecall_decode_partition_t* ms = SGX_CAST(ms_ecall_decode_partition_t*, pms);
+	ms_ecall_decode_partition_t __in_ms;
+	if (memcpy_s(&__in_ms, sizeof(ms_ecall_decode_partition_t), ms, sizeof(ms_ecall_decode_partition_t))) {
+		return SGX_ERROR_UNEXPECTED;
+	}
+	sgx_status_t status = SGX_SUCCESS;
+	const char* _tmp_fileName = __in_ms.ms_fileName;
+	size_t _len_fileName = __in_ms.ms_fileName_len ;
+	char* _in_fileName = NULL;
+
+	CHECK_UNIQUE_POINTER(_tmp_fileName, _len_fileName);
+
+	//
+	// fence after pointer checks
+	//
+	sgx_lfence();
+
+	if (_tmp_fileName != NULL && _len_fileName != 0) {
+		_in_fileName = (char*)malloc(_len_fileName);
+		if (_in_fileName == NULL) {
+			status = SGX_ERROR_OUT_OF_MEMORY;
+			goto err;
+		}
+
+		if (memcpy_s(_in_fileName, _len_fileName, _tmp_fileName, _len_fileName)) {
+			status = SGX_ERROR_UNEXPECTED;
+			goto err;
+		}
+
+		_in_fileName[_len_fileName - 1] = '\0';
+		if (_len_fileName != strlen(_in_fileName) + 1)
+		{
+			status = SGX_ERROR_UNEXPECTED;
+			goto err;
+		}
+	}
+	ecall_decode_partition((const char*)_in_fileName, __in_ms.ms_blockNum);
+
+err:
+	if (_in_fileName) free(_in_fileName);
+	return status;
+}
+
 SGX_EXTERNC const struct {
 	size_t nr_ecall;
-	struct {void* ecall_addr; uint8_t is_priv; uint8_t is_switchless;} ecall_table[4];
+	struct {void* ecall_addr; uint8_t is_priv; uint8_t is_switchless;} ecall_table[5];
 } g_ecall_table = {
-	4,
+	5,
 	{
 		{(void*)(uintptr_t)sgx_ecall_init, 0, 0},
 		{(void*)(uintptr_t)sgx_ecall_file_init, 0, 0},
 		{(void*)(uintptr_t)sgx_ecall_audit_file, 0, 0},
 		{(void*)(uintptr_t)sgx_ecall_generate_file_parity, 0, 0},
+		{(void*)(uintptr_t)sgx_ecall_decode_partition, 0, 0},
 	}
 };
 
 SGX_EXTERNC const struct {
 	size_t nr_ocall;
-	uint8_t entry_table[16][4];
+	uint8_t entry_table[18][5];
 } g_dyn_entry_table = {
-	16,
+	18,
 	{
-		{0, 0, 0, 0, },
-		{0, 0, 0, 0, },
-		{0, 0, 0, 0, },
-		{0, 0, 0, 0, },
-		{0, 0, 0, 0, },
-		{0, 0, 0, 0, },
-		{0, 0, 0, 0, },
-		{0, 0, 0, 0, },
-		{0, 0, 0, 0, },
-		{0, 0, 0, 0, },
-		{0, 0, 0, 0, },
-		{0, 0, 0, 0, },
-		{0, 0, 0, 0, },
-		{0, 0, 0, 0, },
-		{0, 0, 0, 0, },
-		{0, 0, 0, 0, },
+		{0, 0, 0, 0, 0, },
+		{0, 0, 0, 0, 0, },
+		{0, 0, 0, 0, 0, },
+		{0, 0, 0, 0, 0, },
+		{0, 0, 0, 0, 0, },
+		{0, 0, 0, 0, 0, },
+		{0, 0, 0, 0, 0, },
+		{0, 0, 0, 0, 0, },
+		{0, 0, 0, 0, 0, },
+		{0, 0, 0, 0, 0, },
+		{0, 0, 0, 0, 0, },
+		{0, 0, 0, 0, 0, },
+		{0, 0, 0, 0, 0, },
+		{0, 0, 0, 0, 0, },
+		{0, 0, 0, 0, 0, },
+		{0, 0, 0, 0, 0, },
+		{0, 0, 0, 0, 0, },
+		{0, 0, 0, 0, 0, },
 	}
 };
 
@@ -842,6 +910,93 @@ sgx_status_t SGX_CDECL ocall_end_genPar(void)
 
 	return status;
 }
+sgx_status_t SGX_CDECL ocall_write_partition(int numBits)
+{
+	sgx_status_t status = SGX_SUCCESS;
+
+	ms_ocall_write_partition_t* ms = NULL;
+	size_t ocalloc_size = sizeof(ms_ocall_write_partition_t);
+	void *__tmp = NULL;
+
+
+	__tmp = sgx_ocalloc(ocalloc_size);
+	if (__tmp == NULL) {
+		sgx_ocfree();
+		return SGX_ERROR_UNEXPECTED;
+	}
+	ms = (ms_ocall_write_partition_t*)__tmp;
+	__tmp = (void *)((size_t)__tmp + sizeof(ms_ocall_write_partition_t));
+	ocalloc_size -= sizeof(ms_ocall_write_partition_t);
+
+	if (memcpy_verw_s(&ms->ms_numBits, sizeof(ms->ms_numBits), &numBits, sizeof(numBits))) {
+		sgx_ocfree();
+		return SGX_ERROR_UNEXPECTED;
+	}
+
+	status = sgx_ocall(8, ms);
+
+	if (status == SGX_SUCCESS) {
+	}
+	sgx_ocfree();
+	return status;
+}
+
+sgx_status_t SGX_CDECL ocall_write_page(int pageNum, uint8_t* pageData)
+{
+	sgx_status_t status = SGX_SUCCESS;
+	size_t _len_pageData = 2048;
+
+	ms_ocall_write_page_t* ms = NULL;
+	size_t ocalloc_size = sizeof(ms_ocall_write_page_t);
+	void *__tmp = NULL;
+
+
+	CHECK_ENCLAVE_POINTER(pageData, _len_pageData);
+
+	if (ADD_ASSIGN_OVERFLOW(ocalloc_size, (pageData != NULL) ? _len_pageData : 0))
+		return SGX_ERROR_INVALID_PARAMETER;
+
+	__tmp = sgx_ocalloc(ocalloc_size);
+	if (__tmp == NULL) {
+		sgx_ocfree();
+		return SGX_ERROR_UNEXPECTED;
+	}
+	ms = (ms_ocall_write_page_t*)__tmp;
+	__tmp = (void *)((size_t)__tmp + sizeof(ms_ocall_write_page_t));
+	ocalloc_size -= sizeof(ms_ocall_write_page_t);
+
+	if (memcpy_verw_s(&ms->ms_pageNum, sizeof(ms->ms_pageNum), &pageNum, sizeof(pageNum))) {
+		sgx_ocfree();
+		return SGX_ERROR_UNEXPECTED;
+	}
+
+	if (pageData != NULL) {
+		if (memcpy_verw_s(&ms->ms_pageData, sizeof(uint8_t*), &__tmp, sizeof(uint8_t*))) {
+			sgx_ocfree();
+			return SGX_ERROR_UNEXPECTED;
+		}
+		if (_len_pageData % sizeof(*pageData) != 0) {
+			sgx_ocfree();
+			return SGX_ERROR_INVALID_PARAMETER;
+		}
+		if (memcpy_verw_s(__tmp, ocalloc_size, pageData, _len_pageData)) {
+			sgx_ocfree();
+			return SGX_ERROR_UNEXPECTED;
+		}
+		__tmp = (void *)((size_t)__tmp + _len_pageData);
+		ocalloc_size -= _len_pageData;
+	} else {
+		ms->ms_pageData = NULL;
+	}
+
+	status = sgx_ocall(9, ms);
+
+	if (status == SGX_SUCCESS) {
+	}
+	sgx_ocfree();
+	return status;
+}
+
 sgx_status_t SGX_CDECL sgx_oc_cpuidex(int cpuinfo[4], int leaf, int subleaf)
 {
 	sgx_status_t status = SGX_SUCCESS;
@@ -894,7 +1049,7 @@ sgx_status_t SGX_CDECL sgx_oc_cpuidex(int cpuinfo[4], int leaf, int subleaf)
 		return SGX_ERROR_UNEXPECTED;
 	}
 
-	status = sgx_ocall(8, ms);
+	status = sgx_ocall(10, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (cpuinfo) {
@@ -931,7 +1086,7 @@ sgx_status_t SGX_CDECL sgx_thread_wait_untrusted_event_ocall(int* retval, const 
 		return SGX_ERROR_UNEXPECTED;
 	}
 
-	status = sgx_ocall(9, ms);
+	status = sgx_ocall(11, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (retval) {
@@ -968,7 +1123,7 @@ sgx_status_t SGX_CDECL sgx_thread_set_untrusted_event_ocall(int* retval, const v
 		return SGX_ERROR_UNEXPECTED;
 	}
 
-	status = sgx_ocall(10, ms);
+	status = sgx_ocall(12, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (retval) {
@@ -1010,7 +1165,7 @@ sgx_status_t SGX_CDECL sgx_thread_setwait_untrusted_events_ocall(int* retval, co
 		return SGX_ERROR_UNEXPECTED;
 	}
 
-	status = sgx_ocall(11, ms);
+	status = sgx_ocall(13, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (retval) {
@@ -1072,7 +1227,7 @@ sgx_status_t SGX_CDECL sgx_thread_set_multiple_untrusted_events_ocall(int* retva
 		return SGX_ERROR_UNEXPECTED;
 	}
 
-	status = sgx_ocall(12, ms);
+	status = sgx_ocall(14, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (retval) {
@@ -1114,7 +1269,7 @@ sgx_status_t SGX_CDECL pthread_wait_timeout_ocall(int* retval, unsigned long lon
 		return SGX_ERROR_UNEXPECTED;
 	}
 
-	status = sgx_ocall(13, ms);
+	status = sgx_ocall(15, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (retval) {
@@ -1151,7 +1306,7 @@ sgx_status_t SGX_CDECL pthread_create_ocall(int* retval, unsigned long long self
 		return SGX_ERROR_UNEXPECTED;
 	}
 
-	status = sgx_ocall(14, ms);
+	status = sgx_ocall(16, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (retval) {
@@ -1188,7 +1343,7 @@ sgx_status_t SGX_CDECL pthread_wakeup_ocall(int* retval, unsigned long long wait
 		return SGX_ERROR_UNEXPECTED;
 	}
 
-	status = sgx_ocall(15, ms);
+	status = sgx_ocall(17, ms);
 
 	if (status == SGX_SUCCESS) {
 		if (retval) {
