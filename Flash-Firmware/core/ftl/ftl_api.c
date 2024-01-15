@@ -31,7 +31,7 @@
 #include <core\inc\cmn.h>
 #include <core\inc\ftl.h>
 #include <core\inc\ubi.h>
-//#include <core\inc\mtd.h>
+#include <core\inc\mtd.h>
 #include <sys\sys.h>
 #include "ftl_inc.h"
 #include <core\inc\buf.h>
@@ -45,6 +45,7 @@
 #include "hmac.h"
 #include "prp.h"
 #define KEY_SIZE 16
+UINT32 g_LBAnum = 0;
 // end jdafoe
    
 /* Advanced Page Mapping FTL:
@@ -81,7 +82,6 @@ static int current_semiRestricted_writes = 0;
 static int secretLen = 0;
 static int proofLen = 0;
 static uint8_t *proof = NULL;
-static int writePar = 0;
 //int read_loops;
 // end Jdafoe
 
@@ -190,28 +190,6 @@ int EncryptData(uint32_t* KEY,void* buffer, int dataLen)
     }
   return 0;
 }
-
-int DecryptData(uint32_t* KEY,void* buffer, int dataLen)
-{
-   //decrypt after read
-    AesCtx ctx;
-    unsigned char iv[] = "1234"; // Needs to be same between FTL and SGX
-    unsigned char key[16];
-    uint8_t i;
-    for(i=0;i<4;i++){    
-    	key[4*i]=(*(KEY+i))/NUM1;
-    	key[(4*i)+1]=((*(KEY+i))/NUM2)%NUM3;
-    	key[(4*i)+2]=(*(KEY+i)% NUM2)/NUM3;
-    	key[(4*i)+3]=(*(KEY+i)% NUM2)%NUM3;
-    }
-    
-   if( AesCtxIni(&ctx, iv, key, KEY128, EBC) < 0) return -1;
-
-   if (AesDecrypt(&ctx, (unsigned char *)buffer, (unsigned char *)buffer, dataLen) < 0) return -1;
-
-   return 0;
-}
-
 // end Niusen
 // end Jdafoe
 
@@ -302,6 +280,86 @@ STATUS FTL_Init() {
   return ret;
 }
 
+#define PMT_CURRENT_BLOCK  (PM_NODE_BLOCK(root_table.pmt_current_block))
+#define PMT_CURRENT_PAGE   (PM_NODE_PAGE(root_table.pmt_current_block))
+#define PMT_RECLAIM_BLOCK  (PM_NODE_BLOCK(root_table.pmt_reclaim_block))
+#define PMT_RECLAIM_PAGE   (PM_NODE_PAGE(root_table.pmt_reclaim_block))
+
+extern STATUS pmt_reclaim_blocks();
+
+STATUS FTL_MAPI_restore(){  
+  STATUS ret = STATUS_SUCCESS;
+  UINT32 iClusterNum;//???
+  
+  PM_NODE_ADDR iPM_NODE[PM_PER_NODE];//512
+  PM_NODE_ADDR* cache_addr = NULL; 
+  
+  LOG_BLOCK block_stored;
+  PAGE_OFF page_stored;  
+  SPARE spare; 
+  
+  PMT_CLUSTER meta_data[PAGE_PER_PHY_BLOCK];//??1?PMT???????
+  
+  UINT32 i,j; 
+  
+  PMT_CLUSTER pm_cluster;  
+  
+  //?PMT???LEB?BDT????63,??,????PMT???
+  for (i = PMT_START_BLOCK; i < PMT_START_BLOCK + PMT_BLOCK_COUNT; i++) {
+    block_dirty_table[i] = MAX_DIRTY_PAGES;//63 
+  }  
+  pmt_reclaim_blocks();//?PMT?????????????,??pmt?current?,?????PMT???MAPI
+  
+  
+  //MAPI?8?,????II?8?LEB??   
+  iClusterNum=((g_LBAnum + PM_PER_NODE - 1) / PM_PER_NODE);//???471   
+  cache_addr = &(iPM_NODE[0]);
+  PMT_Init();//?????????
+  
+  for(i=0;i<iClusterNum;i=i+PAGE_PER_PHY_BLOCK-1){      
+      
+    for(j=0;j<PAGE_PER_PHY_BLOCK-1;j++){//j<63        
+      pm_cluster=i+j; 
+      //????MAPI???
+      block_stored=(pm_cluster/PAGE_PER_PHY_BLOCK)+PMTRESORE_START_BLOCK;//?LEB46???
+      page_stored=pm_cluster % PAGE_PER_PHY_BLOCK;
+      
+      ret = UBI_Read(block_stored, page_stored, cache_addr, spare);
+      
+      if (ret == STATUS_SUCCESS) {     
+       
+        ret = UBI_Write(PMT_CURRENT_BLOCK, PMT_CURRENT_PAGE,cache_addr, spare, FALSE);
+        if (ret == STATUS_SUCCESS) {
+          meta_data[PMT_CURRENT_PAGE] = pm_cluster;
+         
+        }                 
+        PM_NODE_SET_BLOCKPAGE(root_table.page_mapping_nodes[pm_cluster],PMT_CURRENT_BLOCK, PMT_CURRENT_PAGE);
+        PM_NODE_SET_BLOCKPAGE(root_table.pmt_current_block, PMT_CURRENT_BLOCK, PMT_CURRENT_PAGE+1);
+      }        
+    }
+    //??63?MAP I?,?PMT???????????????????
+    if (ret == STATUS_SUCCESS) {
+      ret = UBI_Write(PMT_CURRENT_BLOCK, PMT_CURRENT_PAGE, meta_data, NULL, FALSE);
+      if (ret == STATUS_SUCCESS) {              
+        ret = pmt_reclaim_blocks();//??pmt?current?,???PMT?????MAPI
+      }       
+    }     
+  }
+  
+  //??root_table.pmt_reclaim_block
+  if (ret == STATUS_SUCCESS) {
+     ret = UBI_Erase(PMT_CURRENT_BLOCK+1, PMT_CURRENT_BLOCK+1);
+   }
+  if (ret == STATUS_SUCCESS) {
+     PM_NODE_SET_BLOCKPAGE(root_table.pmt_reclaim_block, PMT_CURRENT_BLOCK+1, 0);
+     block_dirty_table[PMT_CURRENT_BLOCK+1] = 0;
+  }
+  
+  //todo:???????1?PMT?(???)???1??????????  
+  
+  return ret; 
+}
+
 STATUS FTL_Write(PGADDR addr, void* buffer) {
   STATUS ret;
   
@@ -314,19 +372,10 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
    * 237848 (951392) - Generate temporary key from shared key, derived from nonce.
    * 237849 (951396) - Recieve page next page number to be read for current audit.
    * 237850 (951400) - Set genPar to 1 or 0. Set numBits to correct number.
+   * 237851 (951404) - Restore ALL old mappings! (Up to one).
+   * 237852 (951408) - Enable GC on invalidated blocks.
    */
- 
-  if(addr == 237846) { // 951384
-    if(!writePar) {
-      writePar = 1;
-      uint8_t *temp = buffer;
-      numBits = temp[0];
-    }
-    else {
-      writePar = 0;
-    }
-
-  }
+  
 
   // Generate ecc keypair for diffie hellman
   if(addr == 237847) { // 951388
@@ -415,7 +464,22 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
       genPar = 0;
     }
   }
-
+  
+  if(addr == 237851) { // 951404
+    ret = FTL_MAPI_restore();
+    uart_printf("Restore Good! \n");
+    return ret;
+  }
+  
+  if(addr == 237852) { // 951408
+    for(int i = 0; i < 3991; i++) {
+      
+      if(block_state[i] == 1) {
+        block_state[i] = 2;
+      }
+  }
+  }
+  
   if(addr >= 5000 && addr < restricted_area_end) { // TODO: these "ends" should be defined as constants
   	// writes are simply disabled here.
 	return STATUS_SUCCESS;
@@ -500,9 +564,8 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 				current_semiRestricted_writes = 0;
 				verificationResult = 0;
 				uint8_t signedVerificationResult[KEY_SIZE + 1];
-        signedVerificationResult[0] = verificationResult;
-				hmac_sha1(tempKey, KEY_SIZE, signedVerificationResult, sizeof(uint8_t), signedVerificationResult + 1, &keySize);
-				
+				hmac_sha1(tempKey, KEY_SIZE, signedVerificationResult, sizeof(int), signedVerificationResult + 1, &keySize);
+				signedVerificationResult[0] = verificationResult;
 				FTL_Write(1000, signedVerificationResult);
 				break;
 			}
@@ -513,12 +576,11 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 			if(current_semiRestricted_writes == expected_semiRestricted_writes) {
 				// proof success. Write signed 1 to location for Enclave to read. Reset essential viriables.
 				uint8_t signedVerificationResult[KEY_SIZE + 1];
-        signedVerificationResult[0] = verificationResult;
 				restricted_area_end += expected_semiRestricted_writes;
 				expected_semiRestricted_writes = 0;
 				current_semiRestricted_writes = 0;
-				hmac_sha1(tempKey, KEY_SIZE, signedVerificationResult, sizeof(uint8_t), signedVerificationResult + 1, &keySize);
-
+				hmac_sha1(tempKey, KEY_SIZE, signedVerificationResult, sizeof(int), signedVerificationResult + 1, &keySize);
+				signedVerificationResult[0] = verificationResult;
 				uart_printf("verification result: %d\n", verificationResult);
 				FTL_Write(1000, signedVerificationResult);
 			}
@@ -534,15 +596,6 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 
 	  // If not first semi-restricted write, then progressively check proof.
 	  // If final semi-restricted write, then increase restricted_area_end only if proof passed, and regardless, write signed proof verification results to a certain address, which should be read by the Enclave.
-  }
-
-  if(writePar == 1) {
-    uint8_t *temp = buffer;
-    for(int i = 0; i < 4; i++) {
-      DecryptData((UINT32 *)tempKey, temp + (512 * i), 512);
-    }
-    addr = feistel_network_prp(tempKey, addr, numBits);
-
   }
   
   // end Jdafoe
