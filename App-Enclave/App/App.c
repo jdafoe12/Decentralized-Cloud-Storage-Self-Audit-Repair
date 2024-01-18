@@ -82,11 +82,9 @@ void ocall_get_segment(const char *fileName, int segNum, uint8_t *segData, int t
     send_data_to_server(fileName, strlen(fileName));
 
     /* Send segNum to server*/
-    if (type == 1) {
-        segNum = 2000; // This indicates to the server that type is 1.
-    }
-
     send_data_to_server(&segNum, sizeof(int));
+
+    send_data_to_server(&type, sizeof(int));
 
     /* Recieve segData from server */
     uint8_t *temp;

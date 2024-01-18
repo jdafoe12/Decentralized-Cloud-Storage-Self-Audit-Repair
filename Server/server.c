@@ -166,7 +166,12 @@ void get_segment(int server_fd)
  return;
  }
 
- if(segNum != 2000) {
+ int type;
+ client_fd = accept_connection(server_fd);
+ read(client_fd, &type, sizeof(int));
+ close(client_fd);
+
+ if(type == 0) {
  /* Write segNum to address 951396 */ // TODO: THIS BAD. ONLY DO THIS DURING AUDIT and parity generation.
  if (lseek(fd, 951396 * SEGMENT_SIZE, SEEK_SET) == -1) {
  perror("[lseek]");
