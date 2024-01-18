@@ -166,7 +166,8 @@ void get_segment(int server_fd)
  return;
  }
 
- /* Write segNum to address 951396 */ // TODO: THIS BAD. ONLY DO THIS DURING AUDIT, ?? maybe good now????
+ if(segNum != 2000) {
+ /* Write segNum to address 951396 */ // TODO: THIS BAD. ONLY DO THIS DURING AUDIT and parity generation.
  if (lseek(fd, 951396 * SEGMENT_SIZE, SEEK_SET) == -1) {
  perror("[lseek]");
  close(fd);
@@ -178,6 +179,7 @@ void get_segment(int server_fd)
  perror("[write]");
  close(fd);
  return;
+ }
  }
 
  //struct timeval start, end;

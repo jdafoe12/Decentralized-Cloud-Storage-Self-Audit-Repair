@@ -79,6 +79,7 @@ typedef struct ms_ocall_get_segment_t {
 	const char* ms_fileName;
 	int ms_segNum;
 	uint8_t* ms_segData;
+	int ms_type;
 } ms_ocall_get_segment_t;
 
 typedef struct ms_ocall_init_parity_t {
@@ -727,7 +728,7 @@ sgx_status_t SGX_CDECL ocall_send_nonce(uint8_t* nonce)
 	return status;
 }
 
-sgx_status_t SGX_CDECL ocall_get_segment(const char* fileName, int segNum, uint8_t* segData)
+sgx_status_t SGX_CDECL ocall_get_segment(const char* fileName, int segNum, uint8_t* segData, int type)
 {
 	sgx_status_t status = SGX_SUCCESS;
 	size_t _len_fileName = fileName ? strlen(fileName) + 1 : 0;
@@ -795,6 +796,11 @@ sgx_status_t SGX_CDECL ocall_get_segment(const char* fileName, int segNum, uint8
 		ocalloc_size -= _len_segData;
 	} else {
 		ms->ms_segData = NULL;
+	}
+
+	if (memcpy_verw_s(&ms->ms_type, sizeof(ms->ms_type), &type, sizeof(type))) {
+		sgx_ocfree();
+		return SGX_ERROR_UNEXPECTED;
 	}
 
 	status = sgx_ocall(4, ms);

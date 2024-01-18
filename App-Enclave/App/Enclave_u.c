@@ -53,6 +53,7 @@ typedef struct ms_ocall_get_segment_t {
 	const char* ms_fileName;
 	int ms_segNum;
 	uint8_t* ms_segData;
+	int ms_type;
 } ms_ocall_get_segment_t;
 
 typedef struct ms_ocall_init_parity_t {
@@ -153,7 +154,7 @@ static sgx_status_t SGX_CDECL Enclave_ocall_send_nonce(void* pms)
 static sgx_status_t SGX_CDECL Enclave_ocall_get_segment(void* pms)
 {
 	ms_ocall_get_segment_t* ms = SGX_CAST(ms_ocall_get_segment_t*, pms);
-	ocall_get_segment(ms->ms_fileName, ms->ms_segNum, ms->ms_segData);
+	ocall_get_segment(ms->ms_fileName, ms->ms_segNum, ms->ms_segData, ms->ms_type);
 
 	return SGX_SUCCESS;
 }

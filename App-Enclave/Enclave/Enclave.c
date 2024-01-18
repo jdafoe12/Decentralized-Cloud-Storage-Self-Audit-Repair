@@ -473,7 +473,7 @@ void ecall_generate_file_parity(int fileNum)
 
                 for (int pageSeg = 0; pageSeg < SEGMENT_PER_BLOCK / PAGE_PER_BLOCK; pageSeg++) {
                     segNum = (permutedPageNum * SEGMENT_PER_PAGE) + pageSeg;
-                    ocall_get_segment(files[fileNum].fileName, segNum, segData);
+                    ocall_get_segment(files[fileNum].fileName, segNum, segData, 0);
 					//JD_TEST
 					//ocall_printf("--------------------------------------------\n\n\n", 50, 0);
 					//ocall_printf("(permuted) segment number:", 27,0);
@@ -512,7 +512,7 @@ void ecall_generate_file_parity(int fileNum)
 		tagSegNum = (permutedPageNum * SEGMENT_PER_PAGE) + (tagSegNum % tagPageNum); // note, the tag is after the file, 
 																					// so numBits may be wrong
 
-		ocall_get_segment(files[fileNum].fileName, tagSegNum, segData);
+		ocall_get_segment(files[fileNum].fileName, tagSegNum, segData, 0);
 
 			// JD_TEST
 		//ocall_printf("Have group data. Audit now.", 28, 0);
@@ -559,7 +559,7 @@ void ecall_generate_file_parity(int fileNum)
 
 
 		    uint8_t sigData[SEGMENT_SIZE];
-		    ocall_get_segment(files[fileNum].fileName, permutedSigSegNum, sigData);
+		    ocall_get_segment(files[fileNum].fileName, permutedSigSegNum, sigData, 0);
 
 
 		    DecryptData((uint32_t *)sharedKey, sigData, SEGMENT_SIZE);
@@ -605,6 +605,11 @@ void ecall_generate_file_parity(int fileNum)
 		}
 
     	encode_rs_int(rs, symbolData, symbolData + numDataSymbols);
+
+		//decode_rs_int(rs, symbolData, NULL, 0);
+		
+
+		//ocall_printf("decode?", 8, 0);
 		//ocall_printf("encode good", 12,0);
 		// TODO: just test that all the right data are in the right places in the end
 		// TODO: verify this works, add authentication, and refine the locations on this!
@@ -651,6 +656,12 @@ void ecall_generate_file_parity(int fileNum)
 		        EVP_CIPHER_CTX_free(ctx);
 		        return;
 		    }
+		}
+
+		ocall_printf("Just encrypted parity data for first partition:", 48, 0);
+		for(int l = 0; l < numParityBlocks; l++) {
+
+			ocall_printf(parityData[l + 1], BLOCK_SIZE, 1);
 		}
 
 		EVP_CIPHER_CTX_free(ctx);
@@ -901,7 +912,7 @@ void ecall_decode_partition(const char *fileName, int blockNum)
 
 			for (int pageSeg = 0; pageSeg < SEGMENT_PER_BLOCK / PAGE_PER_BLOCK; pageSeg++) {
 				segNum = (permutedPageNum * SEGMENT_PER_PAGE) + pageSeg;
-				ocall_get_segment(files[fileNum].fileName, segNum, segData);
+				ocall_get_segment(files[fileNum].fileName, segNum, segData, 0);
 				//JD_TEST
 				//ocall_printf("--------------------------------------------\n\n\n", 50, 0);
 				//ocall_printf("(permuted) segment number:", 27,0);
@@ -959,8 +970,16 @@ void ecall_decode_partition(const char *fileName, int blockNum)
 
 	uint8_t* parityData = (uint8_t*)malloc(numParityBlocks * BLOCK_SIZE);
 	for(int i = 0; i < numParityBlocks * SEGMENT_PER_BLOCK; i++) {
-		ocall_get_segment(fileName, PARITY_START + startPage + i, parityData + (i * SEGMENT_SIZE));
+		for(int j = 0; j < SEGMENT_SIZE; j++) {
+
+			parityData[i * SEGMENT_SIZE + j] = 0;
+		}
+		ocall_get_segment(fileName, (PARITY_START * SEGMENT_PER_PAGE) + (startPage * SEGMENT_PER_PAGE) + i, parityData + (i * SEGMENT_SIZE), 1);
 	}
+
+	ocall_printf("PARITY DATA - encrypted", 24, 0);
+
+	ocall_printf(parityData, numParityBlocks * BLOCK_SIZE, 1);
 
 	// Read and decrypt parity data.
 	EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
@@ -985,26 +1004,45 @@ void ecall_decode_partition(const char *fileName, int blockNum)
 		}
 	}
 
+		ocall_printf("PARITY DATA - decrypted", 24, 0);
+
+	ocall_printf(parityData, numParityBlocks * BLOCK_SIZE, 1);
+
 	// We have parity data in parityData.
 	// Now, we must add it to symbolData.
 
 	// Copy the data from parityData to symbolData
 	// Assuming numDataSymbols is the index where data symbols end in symbolData
-	int paritySymbolIndex = numDataSymbols; // Start appending after data symbols
+int paritySymbolIndex = numDataSymbols; // Start appending after data symbols
+for (int currentSymbol = 0; currentSymbol < nroots; currentSymbol++) {
+    int symbolStartAddr = currentSymbol * bytesPerSymbol;
+    if (paritySymbolIndex < totalSymbols) { // Check to prevent buffer overflow
+        symbolData[paritySymbolIndex] = 0;
+        for (int byteIndex = 0; byteIndex < bytesPerSymbol; byteIndex++) {
+            // Combining bytes back into a symbol
+            if ((symbolStartAddr + byteIndex) < (numParityBlocks * BLOCK_SIZE)) { // Ensure we don't read past parityData
+                symbolData[paritySymbolIndex] |= (parityData[symbolStartAddr + byteIndex] << (8 * byteIndex));
+            }
+        }
+        paritySymbolIndex++;
+    }
+}
 
-	for (int currentSymbol = 0; currentSymbol < nroots; currentSymbol++) {
-		int symbolStartAddr = currentSymbol * bytesPerSymbol;
-		if(paritySymbolIndex < totalSymbols) { // Check to prevent buffer overflow
-			symbolData[paritySymbolIndex] = (int)(parityData[symbolStartAddr] | (parityData[symbolStartAddr + 1] << 8));
-			paritySymbolIndex++;
-		}
-	}
+ocall_printf(groupData, groupByteSize, 1);
+
+ocall_printf(parityData, nroots * bytesPerSymbol, 1);
+
+ocall_printf(symbolData, totalSymbols, 1);
 
 	// all symbols now in symboldata. decode.
 
-	decode_rs_int(rs,symbolData, NULL, 0);
+    ocall_printf("HERE0", 6, 0);
 
-	free_rs_char(rs);
+	decode_rs_int(rs, symbolData, NULL, 0);
+
+	ocall_printf("HERE1", 6, 0);
+
+	free_rs_int(rs);
 
 	// Put DATA back in groupData
 	for (int currentSymbol = 0; currentSymbol < numDataSymbols; currentSymbol++) {
@@ -1027,7 +1065,11 @@ void ecall_decode_partition(const char *fileName, int blockNum)
 	// TODO: make procedures be pretty much same as in paper?
 	// TODO: add this ecall to enclave.edl
 
+	ocall_printf("HERE2", 6, 0);
+
 	ocall_write_partition(numBits);
+
+	ocall_printf("HERE3", 6, 0);
 
 	for(int i = 0; i < maxBlocksPerGroup; i++) {
 
@@ -1279,7 +1321,7 @@ void ecall_audit_file(const char *fileName, int *ret)
 	// Get tag from FTL (Note that tag is always  on final segment. This can be calculated easily)
 	uint8_t segData[SEGMENT_SIZE];
 	//ocall_printf("HERE??", 7, 0);
-	ocall_get_segment(fileName, tagSegNum, segData); // ocall get segment will write segNum to addr 951396 then simply read the segment. it should have first 16 bytes encrypted.
+	ocall_get_segment(fileName, tagSegNum, segData, 0); // ocall get segment will write segNum to addr 951396 then simply read the segment. it should have first 16 bytes encrypted.
 
 	DecryptData((uint32_t *)tempKey, segData, KEY_SIZE);
 
@@ -1360,7 +1402,7 @@ void ecall_audit_file(const char *fileName, int *ret)
  	   hmac_sha1(challKey, KEY_SIZE, (uint8_t *)&sigSeg, sizeof(uint8_t), tempKey, &len);
 
  	   uint8_t sigData[SEGMENT_SIZE];
- 	   ocall_get_segment(fileName, sigSeg, sigData);
+ 	   ocall_get_segment(fileName, sigSeg, sigData, 0);
 
  	   DecryptData((uint32_t *)tempKey, sigData, KEY_SIZE);
 
@@ -1502,7 +1544,7 @@ void ecall_audit_file(const char *fileName, int *ret)
 			int segNum = (((uint8_t) indices[j] * SEGMENT_PER_BLOCK)) + k;
 
 	 		hmac_sha1(challKey, KEY_SIZE, (uint8_t *)&segNum, sizeof(uint8_t), tempKey, &len);
-	 		ocall_get_segment(fileName, segNum, segData);
+	 		ocall_get_segment(fileName, segNum, segData, 0);
 	 		DecryptData((uint32_t *)tempKey, segData, KEY_SIZE);
 	 		BN_bin2bn(segData, SEGMENT_SIZE, bsigData);
 

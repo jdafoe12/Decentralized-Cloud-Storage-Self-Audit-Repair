@@ -35,7 +35,7 @@ void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_send_nonce, (uint8_t* nonce));
 #endif
 #ifndef OCALL_GET_SEGMENT_DEFINED__
 #define OCALL_GET_SEGMENT_DEFINED__
-void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_get_segment, (const char* fileName, int segNum, uint8_t* segData));
+void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_get_segment, (const char* fileName, int segNum, uint8_t* segData, int type));
 #endif
 #ifndef OCALL_INIT_PARITY_DEFINED__
 #define OCALL_INIT_PARITY_DEFINED__
