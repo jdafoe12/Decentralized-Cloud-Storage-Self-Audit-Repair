@@ -29,6 +29,10 @@ void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_get_block, (uint8_t* data, size_t segSi
 #define OCALL_PRINTF_DEFINED__
 void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_printf, (unsigned char* buffer, size_t size, int type));
 #endif
+#ifndef OCALL_PRINTINT_DEFINED__
+#define OCALL_PRINTINT_DEFINED__
+void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_printint, (int* buffer));
+#endif
 #ifndef OCALL_SEND_NONCE_DEFINED__
 #define OCALL_SEND_NONCE_DEFINED__
 void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_send_nonce, (uint8_t* nonce));

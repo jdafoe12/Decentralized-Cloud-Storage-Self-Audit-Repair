@@ -26,6 +26,7 @@ void ocall_send_parity(int startPage, uint8_t *parityData, size_t size)
 	send_data_to_server(&size, sizeof(size_t));
 	send_data_to_server(&startPage, sizeof(int));
     send_data_to_server(parityData, sizeof(uint8_t) * size);
+    usleep(10000000);
 
 }
 
@@ -207,6 +208,15 @@ void ocall_printf(unsigned char *buffer, size_t size, int type)
 		}
 		printf("\n");
 	}
+	
+
+}
+
+void ocall_printint(int *buffer) 
+{
+
+	printf("%d\n",*buffer);
+
 	
 
 }

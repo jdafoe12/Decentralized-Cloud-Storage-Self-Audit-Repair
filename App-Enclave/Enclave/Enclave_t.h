@@ -25,6 +25,7 @@ void ecall_decode_partition(const char* fileName, int blockNum);
 sgx_status_t SGX_CDECL ocall_ftl_init(uint8_t* sgx_pubKey, uint8_t* ftl_pubKey);
 sgx_status_t SGX_CDECL ocall_get_block(uint8_t* data, size_t segSize, int segPerBlock, int blockNum, char* fileName);
 sgx_status_t SGX_CDECL ocall_printf(unsigned char* buffer, size_t size, int type);
+sgx_status_t SGX_CDECL ocall_printint(int* buffer);
 sgx_status_t SGX_CDECL ocall_send_nonce(uint8_t* nonce);
 sgx_status_t SGX_CDECL ocall_get_segment(const char* fileName, int segNum, uint8_t* segData, int type);
 sgx_status_t SGX_CDECL ocall_init_parity(int numBits);

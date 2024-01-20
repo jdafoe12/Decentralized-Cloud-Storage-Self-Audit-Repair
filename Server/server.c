@@ -178,6 +178,7 @@ void get_segment(int server_fd)
  close(fd);
  return;
  }
+ 
 
  memcpy(buf, &segNum, sizeof(segNum));
  if (write(fd, buf, SEGMENT_SIZE) == -1) {
@@ -515,8 +516,10 @@ void receive_parity(int server_fd) {
  }
 
  // Loop for writing the data in segments
+ 
  for (int i = 0; i < (size / 4096) - 1; i++) {
  for (int j = 0; j < 2; j++) {
+ usleep(1000000);
  size_t offset = 4096 + (4096 * i) + (2048 * j);
  if (offset + 2048 <= size) {
  if (write(fd, buffer + offset, 2048) == -1) {
@@ -607,7 +610,7 @@ void write_partition(int server_fd) {
 }
 
 void write_page(int server_fd) {
-    int fd;
+ int fd;
  if ((fd = open(PATH, O_RDWR | O_DIRECT)) == -1) {
  perror("[open]");
  return;
@@ -711,16 +714,16 @@ main()
  state_2(server_fd);
  }
  else if(strcmp(command, "end_genPar") == 0) {
-    printf("end genpar\n");
-    end_genPar(server_fd);
+ printf("end genpar\n");
+ end_genPar(server_fd);
  }
  else if(strcmp(command, "write_partition") == 0) {
-   printf("write_partition");
-   write_partition(server_fd);
+ printf("write_partition");
+ write_partition(server_fd);
  }
  else if(strcmp(command, "write_page") == 0) {
-   printf("write_page");
-   write_page(server_fd);
+ printf("write_page");
+ write_page(server_fd);
  }
  else exit(1);
  }

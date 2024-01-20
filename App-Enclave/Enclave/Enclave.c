@@ -382,6 +382,46 @@ cleanup:
     return result;
 }
 
+void code_data(int *symbolData, int blocksInGroup, int type)
+{
+	int groupByteSize = blocksInGroup * BLOCK_SIZE;
+
+	int symSize = 16; // Up to 2^symSize symbols allowed per group.
+						// symSize should be a power of 2 in all cases.
+	int gfpoly = 0x1100B;
+	int fcr = 5;
+	int prim = 1; 
+	int nroots = (groupByteSize / 2) * ((double) ((double) NUM_TOTAL_SYMBOLS / NUM_ORIGINAL_SYMBOLS) - 1);
+	
+	int bytesPerSymbol = symSize / 8;
+	int symbolsPerSegment = SEGMENT_SIZE / bytesPerSymbol;
+	int numDataSymbols = groupByteSize / bytesPerSymbol;
+	int totalSymbols = numDataSymbols + nroots;
+	int numParityBlocks = ceil( (double) (nroots * bytesPerSymbol) / BLOCK_SIZE); // TODO: * bytesPerSymbols??
+
+	ocall_printint(&blocksInGroup);
+	ocall_printint(&groupByteSize);
+	ocall_printint(&bytesPerSymbol);
+	ocall_printint(&numDataSymbols);
+	ocall_printint(&nroots);
+	ocall_printint(&numParityBlocks);
+
+	void *rs = init_rs_int(symSize, gfpoly, fcr, prim, nroots, pow(2, symSize) - (totalSymbols + 1));
+
+	if(type == 0) {
+		encode_rs_int(rs, symbolData, symbolData + numDataSymbols);
+	}
+	else if(type == 1) {
+
+		decode_rs_int(rs, symbolData, NULL, 0);
+	}
+	else {
+
+		// Handle error
+	}
+	free_rs_int(rs);
+}
+
 /*
  * Generate parity. Called by ecall_file_init to generate the parity data after sending the file with tags to storage device.
  *
@@ -587,13 +627,12 @@ void ecall_generate_file_parity(int fileNum)
 		int prim = 1; 
 		int nroots = (groupByteSize / 2) * ((double) ((double) NUM_TOTAL_SYMBOLS / NUM_ORIGINAL_SYMBOLS) - 1);
 		
-		int bytesPerSymbol = pow(2, (log2(symSize) - log2(sizeof(uint8_t))));
+		int bytesPerSymbol = symSize / 8;
 		int symbolsPerSegment = SEGMENT_SIZE / bytesPerSymbol;
         int numDataSymbols = groupByteSize / bytesPerSymbol;
         int totalSymbols = numDataSymbols + nroots;
-		int numParityBlocks = ceil(nroots / BLOCK_SIZE);
+		int numParityBlocks = ceil( (double) (nroots * bytesPerSymbol) / BLOCK_SIZE); // TODO: * bytesPerSymbols??
 
-    	void *rs = init_rs_int(symSize, gfpoly, fcr, prim, nroots, pow(2, symSize) - (totalSymbols + 1));
 
 		int* symbolData = (int*)malloc(totalSymbols * sizeof(int));
 		// Copy the data from groupData to symbolData
@@ -604,9 +643,12 @@ void ecall_generate_file_parity(int fileNum)
     		}
 		}
 
-    	encode_rs_int(rs, symbolData, symbolData + numDataSymbols);
+		code_data(symbolData, blocksInGroup, 0);
 
-		//decode_rs_int(rs, symbolData, NULL, 0);
+
+		//ocall_printf("parity just after encode:", 26, 0);
+
+		ocall_printf(symbolData, totalSymbols * sizeof(int), 1);
 		
 
 		//ocall_printf("decode?", 8, 0);
@@ -616,6 +658,10 @@ void ecall_generate_file_parity(int fileNum)
 
 		// Place all parity data in tempParityData.
 		uint8_t* tempParityData = (uint8_t*)malloc(numParityBlocks * BLOCK_SIZE);
+		for(int i = 0; i < numParityBlocks * BLOCK_SIZE; i++) {
+
+			tempParityData[i] = 0;
+		}
 		for (int currentSymbol = numDataSymbols; currentSymbol < totalSymbols; currentSymbol++) {
 			for(int i = 0; i < bytesPerSymbol; i++) {
     			tempParityData[((currentSymbol * bytesPerSymbol) - (numDataSymbols * bytesPerSymbol)) + i] = (symbolData[currentSymbol] >> ((bytesPerSymbol - (i + 1)) * 8)) & 0xFF;
@@ -631,6 +677,12 @@ void ecall_generate_file_parity(int fileNum)
 
 		// Encrypt parity data and place it in parityData array.
 		//ocall_printf("here6", 6,0);
+
+		//ocall_printf("Parity data before encryption:", 31, 0);
+		//for(int l = 0; l < numParityBlocks; l++) {
+
+		//	ocall_printf(tempParityData + (l * BLOCK_SIZE), BLOCK_SIZE, 1);
+		//}
 
 		EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
 		if (!ctx) {
@@ -658,11 +710,11 @@ void ecall_generate_file_parity(int fileNum)
 		    }
 		}
 
-		ocall_printf("Just encrypted parity data for first partition:", 48, 0);
-		for(int l = 0; l < numParityBlocks; l++) {
+		//ocall_printf("encrypted parity data:", 23, 0);
+		//for(int l = 0; l < numParityBlocks; l++) {
 
-			ocall_printf(parityData[l + 1], BLOCK_SIZE, 1);
-		}
+		//	ocall_printf(parityData[l + 1], BLOCK_SIZE, 1);
+		//}
 
 		EVP_CIPHER_CTX_free(ctx);
 		//ocall_printf("here4", 6,0);
@@ -777,7 +829,7 @@ void ecall_generate_file_parity(int fileNum)
 		startPage += numParityBlocks * PAGE_PER_BLOCK;
 
 		if(group == 0){
-		free_rs_int(rs);
+		//free_rs_int(rs);
     	free(symbolData);
 		}
 		
@@ -941,22 +993,28 @@ void ecall_decode_partition(const char *fileName, int blockNum)
 	// Get the parity and decode with proper parameters.
 
 	// Setup RS parameters
-	int groupByteSize = blocksInGroup * BLOCK_SIZE;
+        int groupByteSize = blocksInGroup * BLOCK_SIZE;
 
-	int symSize = 16; // Up to 2^symSize symbols allowed per group.
-						// symSize should be a power of 2 in all cases.
-	int gfpoly = 0x1100B;
-	int fcr = 5;
-	int prim = 1; 
-	int nroots = (groupByteSize / 2) * ((double) ((double) NUM_TOTAL_SYMBOLS / NUM_ORIGINAL_SYMBOLS) - 1);
-	
-	int bytesPerSymbol = pow(2, (log2(symSize) - log2(sizeof(uint8_t))));
-	int symbolsPerSegment = SEGMENT_SIZE / bytesPerSymbol;
-	int numDataSymbols = groupByteSize / bytesPerSymbol;
-	int totalSymbols = numDataSymbols + nroots;
-	int numParityBlocks = ceil(nroots / BLOCK_SIZE);
+        int symSize = 16; // Up to 2^symSize symbols allowed per group.
+						  // symSize should be a power of 2 in all cases.
+        int gfpoly = 0x1100B;
+		int fcr = 5;
+		int prim = 1; 
+		int nroots = (groupByteSize / 2) * ((double) ((double) NUM_TOTAL_SYMBOLS / NUM_ORIGINAL_SYMBOLS) - 1);
+		
+		int bytesPerSymbol = symSize / 8;
+		int symbolsPerSegment = SEGMENT_SIZE / bytesPerSymbol;
+        int numDataSymbols = groupByteSize / bytesPerSymbol;
+        int totalSymbols = numDataSymbols + nroots;
+		int numParityBlocks = ceil( (double) (nroots * bytesPerSymbol) / BLOCK_SIZE); // TODO: * bytesPerSymbols??
 
-	void *rs = init_rs_int(symSize, gfpoly, fcr, prim, nroots, pow(2, symSize) - (totalSymbols + 1));
+		ocall_printint(&blocksInGroup);
+		ocall_printint(&groupByteSize);
+		ocall_printint(&bytesPerSymbol);
+		ocall_printint(&numDataSymbols);
+		ocall_printint(&nroots);
+		ocall_printint(&numParityBlocks);
+
 
 	int* symbolData = (int*)malloc(totalSymbols * sizeof(int));
 
@@ -969,6 +1027,7 @@ void ecall_decode_partition(const char *fileName, int blockNum)
 	}
 
 	uint8_t* parityData = (uint8_t*)malloc(numParityBlocks * BLOCK_SIZE);
+	startPage += groupNum * numParityBlocks * PAGE_PER_BLOCK;
 	for(int i = 0; i < numParityBlocks * SEGMENT_PER_BLOCK; i++) {
 		for(int j = 0; j < SEGMENT_SIZE; j++) {
 
@@ -977,9 +1036,9 @@ void ecall_decode_partition(const char *fileName, int blockNum)
 		ocall_get_segment(fileName, (PARITY_START * SEGMENT_PER_PAGE) + (startPage * SEGMENT_PER_PAGE) + i, parityData + (i * SEGMENT_SIZE), 1);
 	}
 
-	ocall_printf("PARITY DATA - encrypted", 24, 0);
+	//ocall_printf("PARITY DATA - encrypted", 24, 0);
 
-	ocall_printf(parityData, numParityBlocks * BLOCK_SIZE, 1);
+	//ocall_printf(parityData, numParityBlocks * BLOCK_SIZE, 1);
 
 	// Read and decrypt parity data.
 	EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
@@ -994,19 +1053,26 @@ void ecall_decode_partition(const char *fileName, int blockNum)
 		return;
 	}
 
-	for(int i = 0; i < numParityBlocks; i++) {
-		int out_len;
+// unsigned char buffer[BLOCK_SIZE];
+// int final_out_len;
 
-		if (!EVP_DecryptUpdate(ctx, parityData + (i * SEGMENT_SIZE), &out_len, parityData + (i * BLOCK_SIZE), BLOCK_SIZE)) {
-			// Handle error: Encryption Update failed
-			EVP_CIPHER_CTX_free(ctx);
-			return;
-		}
-	}
+// for(int i = 0; i < numParityBlocks; i++) {
+     int out_len;
+    ocall_printf("Decrypt", 8, 0);
+    if (!EVP_DecryptUpdate(ctx, parityData, &out_len, parityData, BLOCK_SIZE * numParityBlocks)) { // in place decryption
+        // Handle error: Encryption Update failed
+        EVP_CIPHER_CTX_free(ctx);
+        return;
+    }
+// 	final_out_len = out_len;
 
-		ocall_printf("PARITY DATA - decrypted", 24, 0);
+// 	memcpy(parityData + (i * BLOCK_SIZE), buffer, BLOCK_SIZE);
+//     // Optionally copy the final block back to parityData if necessary
+// }
 
-	ocall_printf(parityData, numParityBlocks * BLOCK_SIZE, 1);
+		//ocall_printf("PARITY DATA - decrypted", 24, 0);
+
+	//ocall_printf(parityData, nroots * bytesPerSymbol, 1);
 
 	// We have parity data in parityData.
 	// Now, we must add it to symbolData.
@@ -1016,33 +1082,31 @@ void ecall_decode_partition(const char *fileName, int blockNum)
 int paritySymbolIndex = numDataSymbols; // Start appending after data symbols
 for (int currentSymbol = 0; currentSymbol < nroots; currentSymbol++) {
     int symbolStartAddr = currentSymbol * bytesPerSymbol;
-    if (paritySymbolIndex < totalSymbols) { // Check to prevent buffer overflow
-        symbolData[paritySymbolIndex] = 0;
-        for (int byteIndex = 0; byteIndex < bytesPerSymbol; byteIndex++) {
-            // Combining bytes back into a symbol
-            if ((symbolStartAddr + byteIndex) < (numParityBlocks * BLOCK_SIZE)) { // Ensure we don't read past parityData
-                symbolData[paritySymbolIndex] |= (parityData[symbolStartAddr + byteIndex] << (8 * byteIndex));
-            }
-        }
-        paritySymbolIndex++;
+
+    symbolData[paritySymbolIndex] = 0;
+    for (int byteIndex = 0; byteIndex < bytesPerSymbol; byteIndex++) {
+        // Combining bytes back into a symbol
+        symbolData[paritySymbolIndex] |= ((int) parityData[symbolStartAddr + byteIndex] << (8 * ((byteIndex + 1) % 2)));
+
     }
+    paritySymbolIndex++;
 }
 
-ocall_printf(groupData, groupByteSize, 1);
+//ocall_printf(groupData, groupByteSize, 1);
 
-ocall_printf(parityData, nroots * bytesPerSymbol, 1);
+//ocall_printf(symbolData + numDataSymbols, nroots * sizeof(int), 1);
 
-ocall_printf(symbolData, totalSymbols, 1);
+	ocall_printf(symbolData, totalSymbols * sizeof(int), 1);
 
 	// all symbols now in symboldata. decode.
 
     ocall_printf("HERE0", 6, 0);
 
-	decode_rs_int(rs, symbolData, NULL, 0);
+	code_data(symbolData, blocksInGroup, 1);
 
 	ocall_printf("HERE1", 6, 0);
 
-	free_rs_int(rs);
+	//free_rs_int(rs);
 
 	// Put DATA back in groupData
 	for (int currentSymbol = 0; currentSymbol < numDataSymbols; currentSymbol++) {

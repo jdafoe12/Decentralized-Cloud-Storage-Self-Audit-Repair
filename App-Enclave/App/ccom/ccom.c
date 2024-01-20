@@ -25,7 +25,7 @@ int create_client_socket() {
 }
 
 void connect_to_server(int client_fd) {
-	usleep(50000);
+	usleep(100000);
     struct sockaddr_in serv_addr;
 
     // Set server address and port

@@ -45,6 +45,10 @@ typedef struct ms_ocall_printf_t {
 	int ms_type;
 } ms_ocall_printf_t;
 
+typedef struct ms_ocall_printint_t {
+	int* ms_buffer;
+} ms_ocall_printint_t;
+
 typedef struct ms_ocall_send_nonce_t {
 	uint8_t* ms_nonce;
 } ms_ocall_send_nonce_t;
@@ -139,6 +143,14 @@ static sgx_status_t SGX_CDECL Enclave_ocall_printf(void* pms)
 {
 	ms_ocall_printf_t* ms = SGX_CAST(ms_ocall_printf_t*, pms);
 	ocall_printf(ms->ms_buffer, ms->ms_size, ms->ms_type);
+
+	return SGX_SUCCESS;
+}
+
+static sgx_status_t SGX_CDECL Enclave_ocall_printint(void* pms)
+{
+	ms_ocall_printint_t* ms = SGX_CAST(ms_ocall_printint_t*, pms);
+	ocall_printint(ms->ms_buffer);
 
 	return SGX_SUCCESS;
 }
@@ -264,13 +276,14 @@ static sgx_status_t SGX_CDECL Enclave_pthread_wakeup_ocall(void* pms)
 
 static const struct {
 	size_t nr_ocall;
-	void * table[18];
+	void * table[19];
 } ocall_table_Enclave = {
-	18,
+	19,
 	{
 		(void*)Enclave_ocall_ftl_init,
 		(void*)Enclave_ocall_get_block,
 		(void*)Enclave_ocall_printf,
+		(void*)Enclave_ocall_printint,
 		(void*)Enclave_ocall_send_nonce,
 		(void*)Enclave_ocall_get_segment,
 		(void*)Enclave_ocall_init_parity,

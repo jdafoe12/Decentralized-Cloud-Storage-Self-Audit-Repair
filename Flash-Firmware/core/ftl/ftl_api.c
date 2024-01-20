@@ -80,8 +80,7 @@ static int expected_semiRestricted_writes = 0;
 static int current_semiRestricted_writes = 0;
 static int secretLen = 0;
 static int proofLen = 0;
-static uint8_t *proof = NULL;
-static int writePar = 0;
+static uint8_t proof[1024];
 //int read_loops;
 // end Jdafoe
 
@@ -190,28 +189,6 @@ int EncryptData(uint32_t* KEY,void* buffer, int dataLen)
     }
   return 0;
 }
-
-int DecryptData(uint32_t* KEY,void* buffer, int dataLen)
-{
-   //decrypt after read
-    AesCtx ctx;
-    unsigned char iv[] = "1234"; // Needs to be same between FTL and SGX
-    unsigned char key[16];
-    uint8_t i;
-    for(i=0;i<4;i++){    
-    	key[4*i]=(*(KEY+i))/NUM1;
-    	key[(4*i)+1]=((*(KEY+i))/NUM2)%NUM3;
-    	key[(4*i)+2]=(*(KEY+i)% NUM2)/NUM3;
-    	key[(4*i)+3]=(*(KEY+i)% NUM2)%NUM3;
-    }
-    
-   if( AesCtxIni(&ctx, iv, key, KEY128, EBC) < 0) return -1;
-
-   if (AesDecrypt(&ctx, (unsigned char *)buffer, (unsigned char *)buffer, dataLen) < 0) return -1;
-
-   return 0;
-}
-
 // end Niusen
 // end Jdafoe
 
@@ -315,18 +292,7 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
    * 237849 (951396) - Recieve page next page number to be read for current audit.
    * 237850 (951400) - Set genPar to 1 or 0. Set numBits to correct number.
    */
- 
-  if(addr == 237846) { // 951384
-    if(!writePar) {
-      writePar = 1;
-      uint8_t *temp = buffer;
-      numBits = temp[0];
-    }
-    else {
-      writePar = 0;
-    }
-
-  }
+  
 
   // Generate ecc keypair for diffie hellman
   if(addr == 237847) { // 951388
@@ -418,13 +384,17 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 
   if(addr >= 5000 && addr < restricted_area_end) { // TODO: these "ends" should be defined as constants
   	// writes are simply disabled here.
+    uart_printf("in fail\n");
 	return STATUS_SUCCESS;
   }
   if(addr >= (restricted_area_end) && addr <= 10000) {
+    
+
 	  
 	  size_t keySize = KEY_SIZE;
 	  // very first is to check magic number. if it is "PARITY", then set expected_semiRestricted_writes and current_semiRestricted_writes to 0.
 	  uint8_t *temp = buffer;
+         
 
 	  int loc = 0;
 
@@ -433,10 +403,12 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 		magicNumber[i] = temp[i];
 	  }
 	  if(strcmp("PARITY", magicNumber) == 0) {
+            uart_printf("found magic number\n");
 		loc += 6;
 		// generate groupKey... this _should_ be the only tempKey?
 		hmac_sha1(dh_sharedKey, KEY_SIZE, temp + loc, KEY_SIZE, tempKey, &keySize);
 		loc += KEY_SIZE;
+                uart_printf("mag sha1 done\n");
 
 		// get expected_semiRestricted_writes
                 memcpy(&expected_semiRestricted_writes, temp + loc, sizeof(int));
@@ -447,19 +419,24 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 		loc += sizeof(int);
 		secretLen = (proofLen / expected_semiRestricted_writes) * 8;
 		// get proof
-		if(proof != NULL) {	
-			free(proof);
-		}
+		//if(proof != NULL) {
+                //  uart_printf("call free\n");
+		//	free(proof);
+                //        uart_printf("free done\n");
+		//}
 
-		proof = malloc(proofLen);
+		//proof = malloc(proofLen);
 		if(proof == NULL) {
 			// Handle error
+                  uart_printf("malloc fail\n");
 		}
 
 		memcpy(proof, temp + loc, proofLen);
 		loc += proofLen;
 		uint8_t signature[KEY_SIZE];
+                uart_printf("mag sha1 2 start\n");
 		hmac_sha1(tempKey, KEY_SIZE, temp, loc, signature, &keySize);
+                uart_printf("mag sha1 2 done\n");
 
                 
 		if(memcmp(signature, temp + loc, KEY_SIZE) != 0) {
@@ -469,18 +446,24 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 		}
 		//if() // other fail conditions TODO: Think of any additional fail conditions.
 		prng_init((uint32_t) tempKey[0]);
+                uart_printf("Found magic number done.\n");
 	  }
 	  else if(expected_semiRestricted_writes > current_semiRestricted_writes) {
 		// progressively check proof.
 		if(restricted_area_end + current_semiRestricted_writes != addr) {
 			expected_semiRestricted_writes = 0;
 			current_semiRestricted_writes = 0;
+                        uart_printf("in fail 2\n");
 			return STATUS_SUCCESS; // TODO: think if this is really all that needs to be done on fail. There is an implicit failsafe... no comm with TEE here.
 		}
+                
+                uart_printf("checking...\n");
 
 
 		int randLen = secretLen * log2((2048 * 8) / secretLen);
+                uart_printf("malloc\n");
 		uint8_t *pageRand = (uint8_t *) malloc(secretLen * sizeof(uint8_t));
+                uart_printf("end malloc\n");
                 for(int l = 0; l < secretLen; l++) {
                   pageRand[l] = 0;
                 }
@@ -500,9 +483,8 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 				current_semiRestricted_writes = 0;
 				verificationResult = 0;
 				uint8_t signedVerificationResult[KEY_SIZE + 1];
-        signedVerificationResult[0] = verificationResult;
-				hmac_sha1(tempKey, KEY_SIZE, signedVerificationResult, sizeof(uint8_t), signedVerificationResult + 1, &keySize);
-				
+				hmac_sha1(tempKey, KEY_SIZE, signedVerificationResult, sizeof(int), signedVerificationResult + 1, &keySize);
+				signedVerificationResult[0] = verificationResult;
 				FTL_Write(1000, signedVerificationResult);
 				break;
 			}
@@ -513,12 +495,11 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 			if(current_semiRestricted_writes == expected_semiRestricted_writes) {
 				// proof success. Write signed 1 to location for Enclave to read. Reset essential viriables.
 				uint8_t signedVerificationResult[KEY_SIZE + 1];
-        signedVerificationResult[0] = verificationResult;
 				restricted_area_end += expected_semiRestricted_writes;
 				expected_semiRestricted_writes = 0;
 				current_semiRestricted_writes = 0;
-				hmac_sha1(tempKey, KEY_SIZE, signedVerificationResult, sizeof(uint8_t), signedVerificationResult + 1, &keySize);
-
+				hmac_sha1(tempKey, KEY_SIZE, signedVerificationResult, sizeof(int), signedVerificationResult + 1, &keySize);
+				signedVerificationResult[0] = verificationResult;
 				uart_printf("verification result: %d\n", verificationResult);
 				FTL_Write(1000, signedVerificationResult);
 			}
@@ -535,19 +516,12 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 	  // If not first semi-restricted write, then progressively check proof.
 	  // If final semi-restricted write, then increase restricted_area_end only if proof passed, and regardless, write signed proof verification results to a certain address, which should be read by the Enclave.
   }
-
-  if(writePar == 1) {
-    uint8_t *temp = buffer;
-    for(int i = 0; i < 4; i++) {
-      DecryptData((UINT32 *)tempKey, temp + (512 * i), 512);
-    }
-    addr = feistel_network_prp(tempKey, addr, numBits);
-
-  }
   
   // end Jdafoe
   
   BOOL is_hot = HDI_IsHotPage(addr);
+  
+  //uart_printf("write\n");
   
   ret = DATA_Write(addr, buffer, is_hot);
   if (ret == STATUS_SUCCESS) {
@@ -558,6 +532,7 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
       }
     }
   }
+  uart_printf("write done\n");
   return ret;
 }
 
@@ -596,7 +571,7 @@ STATUS FTL_Read(PGADDR addr, void* buffer) {
   }
   
   LOG_BLOCK block;
-  PAGE_OFF page;
+  PAGE_OFF page; 
   STATUS ret;
 
   ret = PMT_Search(addr, &block, &page);
