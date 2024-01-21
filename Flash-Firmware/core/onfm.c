@@ -46,6 +46,8 @@
 #include <core\ftl\ftl_inc.h>
 #endif
 
+#include <core\ftl\ftl_inc.h>
+
 #include <stdio.h>
 
 /* implement ONFM based on RAM, for bus debugging/testing */
@@ -58,6 +60,11 @@ int onfm_read_sector(unsigned long sector_addr, void* sector_data);
 
 static
 int onfm_write_sector(unsigned long sector_addr, void* sector_data);
+
+//JD
+int cache_size = 0;
+UINT32 map_cache[MAX_CACHE_SIZE][PM_PER_NODE + 1];
+// end JD
 
 #if defined(__ICCARM__)
 #pragma data_alignment=DMA_BURST_BYTES
@@ -165,17 +172,21 @@ int ONFM_Read(unsigned long sector_addr, unsigned long sector_count,
 
 int ONFM_Write(unsigned long sector_addr, unsigned long sector_count,
                void* sector_data) {
+  //uart_printf("in write, addr: %d\n", sector_addr);
   unsigned long i;
   STATUS status;
   int ret = 0;
-  //void* sec_DRAM_addr = NULL;
 
+  //JD
   
-     // for helloworld test by bochen
- /* unsigned char s[64];
-  memset(s, 0, 64);
-  sprintf(s, "USB is writing ...\n\r");
-  UartWrite(s, strlen(s));*/
+  // Get mapping before the write
+  PGADDR addr = sector_addr >> SECTOR_PER_MPP_SHIFT;
+  //uart_printf("Write address %d\n", addr);
+  LOG_BLOCK oldBlock;
+  PAGE_OFF oldPage;
+    ret = PMT_Search(addr, &oldBlock, &oldPage);
+  //uart_printf("OLD MAPPING: B - %d P - %d\n", oldBlock, oldPage);
+  // JD end
   
   /* disable read buffer if something is written */
   read_buffer_start_sector = INVALID_LSADDR;
@@ -193,6 +204,8 @@ int ONFM_Write(unsigned long sector_addr, unsigned long sector_count,
     // EXPERIMENT STOP
     /* write the full/aligned MPP directly, bypass the buffer merge */
     status = FTL_Write(sector_addr >> SECTOR_PER_MPP_SHIFT, sector_data);
+    
+           
     if (status == STATUS_SUCCESS) {
       ret = 0;
     } else {
@@ -213,9 +226,150 @@ int ONFM_Write(unsigned long sector_addr, unsigned long sector_count,
       ret = onfm_write_sector((unsigned long) (-1), NULL);
     }
   }
+  
+  // JD
 
+  // Get mapping after the write
+  LOG_BLOCK newBlock;
+  PAGE_OFF newPage;
+
+    ret = PMT_Search(addr, &newBlock, &newPage);
+
+  //uart_printf("NEW MAPPING: B - %d P - %d\n", newBlock, newPage);
+  // uart_printf("NEW? block: %d page: %d\n", newBlock, newPage);
+  //uart_printf("OLD: %d NEW: %d\n", oldBlock, newBlock);
+  
+  
+  if(oldBlock != newBlock || oldPage != newPage) { // The mapping has been updated
+   // uart_printf("saving old mapping\n");
+    
+    
+    PMT_CLUSTER cluster = CLUSTER_INDEX(addr); // The cluster of the mapping indicates where it is.This is the cluster for the mapping to update.
+   
+    // Check if the cluster is in cache
+    for(int i = 0; i < MAX_CACHE_SIZE; i++) {
+      if(map_cache[i][512] == cluster) {
+          if(oldBlock == INVALID_BLOCK) {
+            PM_NODE_SET_BLOCKPAGE(map_cache[i][PAGE_IN_CLUSTER(addr)], newBlock, newPage);
+          }
+          else {
+            PM_NODE_SET_BLOCKPAGE(map_cache[i][PAGE_IN_CLUSTER(addr)], oldBlock, oldPage);
+          }
+          uart_printf("cache hit\n");
+          goto IN_CACHE;
+      }
+    }
+    uart_printf("cache miss\n");
+    
+    // The cluster is not in cache. 
+    // First, write the front cluster in cache to storage
+    if(cache_size == MAX_CACHE_SIZE) {
+      cache_remove();
+    }
+    
+    // Add current cluster to end of queue
+    
+    // First, read the cluster into the queue
+    int index = cache_add(cluster);
+    uart_printf("index: %d\n", index);
+    if(index != -1) {
+      // Change the desired entry
+      if(oldBlock == INVALID_BLOCK) {
+        PM_NODE_SET_BLOCKPAGE(map_cache[index][PAGE_IN_CLUSTER(addr)], newBlock, newPage);
+       }
+       else {
+         PM_NODE_SET_BLOCKPAGE(map_cache[index][PAGE_IN_CLUSTER(addr)], oldBlock, oldPage);
+       }
+    }
+    
+  }
+  IN_CACHE:
+  // JD end
+  //uart_printf("done\n");
   return ret;
 }
+
+// JD
+// Function to dequeue mapping cache (Write first cache entry to disk, and move others forward
+void cache_remove() {
+  
+  if(cache_size == 0) {
+    return;
+  }
+  cache_size--;
+  PMT_CLUSTER write_cluster = map_cache[0][PM_PER_NODE];
+    UINT32 pmNodes[PM_PER_NODE];
+    LOG_BLOCK pmBlock = PMTRESORE_START_BLOCK + (int)(write_cluster / PAGE_PER_PHY_BLOCK); // The logical block number for the backed up cluster
+    PAGE_OFF pmPage = write_cluster % PAGE_PER_PHY_BLOCK; // the page offset in pm block
+    
+    
+    
+    //UINT32 data[64][512]; // There is not enouph memory to hold the block.We can use the storage device as extended RAM
+    UBI_Erase(600, 600);
+    for(int i = 0; i < 64; i++) { // We need to overwrite the entire block
+      
+      //uart_printf("pmblock %d pmpage %d\n", pmBlock, pmPage);
+      
+      if(i != pmPage) {
+        // Read the page
+
+          UBI_Read(pmBlock, i, &(pmNodes[0]), NULL); 
+
+      }
+      else {
+        for(int j = 0; j<PM_PER_NODE; j++) {
+          pmNodes[j] = map_cache[0][j]; // Update the cluster.
+        }
+      }
+      //uart_printf("Saved Mapping: %d %d ",PM_NODE_BLOCK(pmNodes[PAGE_IN_CLUSTER(addr)]), PM_NODE_PAGE(pmNodes[PAGE_IN_CLUSTER(addr)]));
+      //if(i == pmPage) {
+        //if(oldBlock == INVALID_BLOCK) {
+          //PM_NODE_SET_BLOCKPAGE(pmNodes[PAGE_IN_CLUSTER(addr)], newBlock, newPage);
+        //}
+        //else {
+          //PM_NODE_SET_BLOCKPAGE(pmNodes[PAGE_IN_CLUSTER(addr)], oldBlock, oldPage);
+        //}
+      //}
+      
+      // Write the page to a temporary location
+      UBI_Write(600, i, &(pmNodes[0]), NULL, FALSE);
+    }
+    uart_printf("Erase Block: %d\n", pmBlock);
+    UBI_Erase(pmBlock, pmBlock);
+    
+    // Write back the updated block
+    for( int i = 0; i < 64; i++) {
+      SPARE spare;
+      spare[0] = write_cluster;
+        UBI_Read(600, i, &(pmNodes[0]), NULL);
+        UBI_Write(pmBlock, i,&(pmNodes[0]), spare, FALSE);
+    }
+    for(int i = 0; i < MAX_CACHE_SIZE - 1; i++) {
+      for(int j = 0; j <= PM_PER_NODE; j++) {
+        map_cache[i][j] = map_cache[i + 1][j];
+      }
+    }
+    
+}
+
+// Returns -1 on failure, otherwise returns index of new cluster.
+int cache_add(int cluster) {
+  int index = MAX_CACHE_SIZE - 1;
+  index = cache_size;
+  if(cache_size == MAX_CACHE_SIZE) {
+    return -1;
+  }
+  cache_size++;
+  LOG_BLOCK pmBlock = PMTRESORE_START_BLOCK + (int)(cluster / PAGE_PER_PHY_BLOCK); // The logical block number for the backed up cluster
+  PAGE_OFF pmPage = cluster % PAGE_PER_PHY_BLOCK; // the page offset in pm block
+
+    UBI_Read(pmBlock, pmPage, map_cache[index], NULL);
+
+  map_cache[index][PM_PER_NODE] = cluster;
+    return index;
+}
+
+// JD end
 
 int ONFM_Unmount() {
   int onfm_ret;

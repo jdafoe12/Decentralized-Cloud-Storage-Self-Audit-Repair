@@ -60,7 +60,7 @@ typedef UINT8 DIRTY_PAGE_COUNT;
 #define CLUSTER_INDEX(pa)           ((pa)/PM_PER_NODE)
 #define PAGE_IN_CLUSTER(pa)         ((pa)%PM_PER_NODE)
 
-//Ôà¿é±í
+//Ã”Ã Â¿Ã©Â±Ã­
 #define BDT_BLOCK0         (0)
 #define BDT_BLOCK1         (1)
 
@@ -73,6 +73,18 @@ typedef UINT8 DIRTY_PAGE_COUNT;
 #define PMT_START_BLOCK    (6)
 /* TODO: shrink PMT size, by removing PMT of continous pages */
 #define PMT_BLOCK_COUNT    (((CFG_LOG_BLOCK_COUNT+PM_PER_NODE-1)/PM_PER_NODE) * 5)//40
+
+//JD
+#define PMTRESORE_START_BLOCK (PMT_START_BLOCK+PMT_BLOCK_COUNT)//46
+#define PMTRESORE_BLOCK_COUNT (8)//???MAPI,??8?LEB?
+
+#define FTL_reserved_START_BLOCK  (PMTRESORE_START_BLOCK+PMTRESORE_BLOCK_COUNT)//54
+#define FTL_reserved_BLOCK_COUNT  (1)//???FTL????(?MAP I??),??1?LEB?
+
+
+#define UBI_reserved_START_BLOCK (FTL_reserved_START_BLOCK+FTL_reserved_BLOCK_COUNT)//55
+#define UBI_reserved_BLOCK_COUNT (1)//???UBI????(?? MAP II),??1?LEB?
+//end JD
 
 #define DATA_START_BLOCK   (PMT_START_BLOCK+PMT_BLOCK_COUNT)//46
 #define DATA_LAST_BLOCK    (UBI_Capacity-1)//3989-1=3988
@@ -111,6 +123,17 @@ typedef struct {
 
 extern ROOT root_table;
 extern DIRTY_PAGE_COUNT block_dirty_table[];
+
+//JD 
+extern int ftl_read_state;
+#define MAX_CACHE_SIZE 15
+extern int cache_size;
+extern UINT32 map_cache[MAX_CACHE_SIZE][PM_PER_NODE + 1];
+extern UINT8 block_state[3991];
+void cache_remove();
+int cache_add(int cluster);
+// JD end
+
 
 
 
@@ -520,4 +543,3 @@ STATUS ROOT_Init();
 STATUS ROOT_Commit();
 
 #endif
-

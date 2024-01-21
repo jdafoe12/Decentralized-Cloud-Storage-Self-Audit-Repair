@@ -57,7 +57,12 @@ static PMT_CLUSTER meta_data[PAGE_PER_PHY_BLOCK];
 static PMT_CLUSTER clusters[MPP_SIZE / sizeof(PMT_CLUSTER)];
 static UINT8 pm_node_buffer[MPP_SIZE];
 
-static STATUS pmt_reclaim_blocks();
+//static STATUS pmt_reclaim_blocks();
+
+// JD
+UINT8 block_state[3991] = {0};
+extern  STATUS pmt_reclaim_blocks();
+// end JD
 
 STATUS PMT_Format() {
   LOG_BLOCK pmt_block = PMT_START_BLOCK;
@@ -110,7 +115,7 @@ STATUS PMT_Format() {
 
     /* update block dirty table */
     block_dirty_table[pmt_block] = 0;
-    block_dirty_table[pmt_block + 1] = 0;//ÎªÊ²Ã´ÉèÖÃÕâ¸ö¿é??
+    block_dirty_table[pmt_block + 1] = 0;//ä¸ºä»€ä¹ˆè®¾ç½®è¿™ä¸ªå—??
   }
 
   return ret;
@@ -132,7 +137,7 @@ STATUS PMT_Init() {
 }
 
 STATUS PMT_Update(PGADDR page_addr, LOG_BLOCK block, PAGE_OFF page) {
-  PMT_CLUSTER cluster = CLUSTER_INDEX(page_addr);//¼ÆËãÂß¼­IµØÖ·ËùÔÚ´ØºÅ
+  PMT_CLUSTER cluster = CLUSTER_INDEX(page_addr);//è®¡ç®—é€»è¾‘Iåœ°å€æ‰€åœ¨ç°‡å·
   PM_NODE_ADDR* cluster_addr;
   LOG_BLOCK edit_block;
   STATUS ret = STATUS_SUCCESS;
@@ -151,6 +156,11 @@ STATUS PMT_Update(PGADDR page_addr, LOG_BLOCK block, PAGE_OFF page) {
       /* update BDT: increase dirty page count of the edited data block */
       edit_block = PM_NODE_BLOCK(cluster_addr[PAGE_IN_CLUSTER(page_addr)]);
       block_dirty_table[edit_block]++;
+      
+      if(block_dirty_table[edit_block] == 63) {
+          block_state[edit_block] = 1;
+      }
+      
       ASSERT(block_dirty_table[edit_block] <= MAX_DIRTY_PAGES);
     }
 
@@ -331,7 +341,7 @@ STATUS PMT_Commit() {
   return ret;
 }
 
-static STATUS pmt_reclaim_blocks() {
+STATUS pmt_reclaim_blocks() {
   UINT32 i = 0;
   UINT32 found_block = 0;
   UINT32 total_valid_page = 0;
@@ -463,3 +473,4 @@ static STATUS pmt_reclaim_blocks() {
 
   return ret;
 }
+

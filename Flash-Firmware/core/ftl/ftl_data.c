@@ -53,7 +53,7 @@ STATUS DATA_Format() {
   STATUS ret = STATUS_SUCCESS;
 
   /* init the bdt to all dirty */
-  //������4096�������鶼���Ϊ�࣬�����п��invalidҳ��Ϊ63
+  //把所有4096个物理块都标记为脏，即所有块的invalid页都为63
   for (i = 0; i < CFG_LOG_BLOCK_COUNT; i++) {
     block_dirty_table[i] = MAX_DIRTY_PAGES;
   }
@@ -61,12 +61,12 @@ STATUS DATA_Format() {
   /* init the journal blocks in root table */
   for (i = 0; i < JOURNAL_BLOCK_COUNT; i++) {
     if (ret == STATUS_SUCCESS) {
-      ret = UBI_Erase(block, block);//����data block����һ����
+      ret = UBI_Erase(block, block);//擦除data block区第一个块
     }
 
     if (ret == STATUS_SUCCESS) {
-      PM_NODE_SET_BLOCKPAGE(root_table.hot_journal[i], block, 0);//����root table
-      block_dirty_table[block] = 0;//��data block����һ������Ϊ������invalidҳΪ0
+      PM_NODE_SET_BLOCKPAGE(root_table.hot_journal[i], block, 0);//设置root table
+      block_dirty_table[block] = 0;//将data block区第一个块标记为净，即invalid页为0
       block++;
     }
   }
@@ -199,7 +199,7 @@ BOOL DATA_IsFull(BOOL hot_journal) {
   BOOL ret = TRUE;
 
   for (i = 0; i < JOURNAL_BLOCK_COUNT; i++) {
-    if (hot_journal == TRUE) {//����ҳ���귵��true��û���꣬����false
+    if (hot_journal == TRUE) {//块中页用完返回true，没用完，返回false
       if (PM_NODE_PAGE(root_table.hot_journal[i]) < PAGE_PER_PHY_BLOCK - 1) {
         ret = FALSE;
         break;
@@ -278,7 +278,8 @@ STATUS DATA_Reclaim(BOOL is_hot) {
           continue;
         }
 
-        if (block_dirty_table[i] == target_dirty_count) {
+        if (block_dirty_table[i] == target_dirty_count && block_state[i] == 2) {
+          block_state[i] = 0;
           dirty_blocks[found_block] = i;
           total_valid_page += (MAX_DIRTY_PAGES - block_dirty_table[i]);
           found_block++;
@@ -315,11 +316,11 @@ STATUS DATA_Reclaim(BOOL is_hot) {
         if (ret == STATUS_SUCCESS) {
           for (page = 0; page < PAGE_PER_PHY_BLOCK - 1; page++) {
             if (ret == STATUS_SUCCESS) {
-              ret = PMT_Search(pages_buffer[page][0], &true_block, &true_page);//���Ҹ��߼���ַI����Ӧ�Ŀ顢ҳ��
+              ret = PMT_Search(pages_buffer[page][0], &true_block, &true_page);//查找各逻辑地址I所对应的块、页号
             }
 
             if (ret == STATUS_SUCCESS) {
-              if (true_block == dirty_block && true_page == page) {//����validҳ
+              if (true_block == dirty_block && true_page == page) {//若是valid页
                 /* this page is valid */
                 /* copy valid page to reclaim block */
                 ret = UBI_Read(dirty_block, page, data_buffer, spare);
