@@ -82,6 +82,7 @@ static int current_semiRestricted_writes = 0;
 static int secretLen = 0;
 static int proofLen = 0;
 static uint8_t proof[1024];
+static int writePartition = 0;
 
 //int read_loops;
 // end Jdafoe
@@ -132,6 +133,26 @@ static void prng_init(uint32_t seed)
 #define NUM1     (1<<24)
 #define NUM2     (1<<16)
 #define NUM3     (1<<8)
+int DecryptData(uint32_t* KEY,void* buffer, int dataLen)
+{
+   //decrypt after read
+    AesCtx ctx;
+    unsigned char iv[] = "1234"; // Needs to be same between FTL and SGX
+    unsigned char key[16];
+    uint8_t i;
+    for(i=0;i<4;i++){    
+    	key[4*i]=(*(KEY+i))/NUM1;
+    	key[(4*i)+1]=((*(KEY+i))/NUM2)%NUM3;
+    	key[(4*i)+2]=(*(KEY+i)% NUM2)/NUM3;
+    	key[(4*i)+3]=(*(KEY+i)% NUM2)%NUM3;
+    }
+    
+   if( AesCtxIni(&ctx, iv, key, KEY128, EBC) < 0) return -1;
+
+   if (AesDecrypt(&ctx, (unsigned char *)buffer, (unsigned char *)buffer, dataLen) < 0) return -1;
+
+   return 0;
+}
 int EncryptData(uint32_t* KEY,void* buffer, int dataLen)
 {
     //encrypt before writing
@@ -368,7 +389,7 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
   // Jdafoe
   
   /*
-   * 237846 (951384) - Explicit mode change.. TODO
+   * 237846 (951384) - Set writePartition to 1 or 0. 
    * 237847 (951388) - Generate shared key via Diffie-Hellman key exchange.
    * 237848 (951392) - Generate temporary key from shared key, derived from nonce.
    * 237849 (951396) - Recieve page next page number to be read for current audit.
@@ -377,6 +398,15 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
    * 237852 (951408) - Enable GC on invalidated blocks.
    */
   
+
+  if(addr == 237846) { // 951384
+    if(writePartition == 0) {
+      writePartition = 1;
+    }
+    else {
+      writePartition = 0;
+    }
+  }
 
   // Generate ecc keypair for diffie hellman
   if(addr == 237847) { // 951388
@@ -614,6 +644,14 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 
 	  // If not first semi-restricted write, then progressively check proof.
 	  // If final semi-restricted write, then increase restricted_area_end only if proof passed, and regardless, write signed proof verification results to a certain address, which should be read by the Enclave.
+  }
+
+  if(writePartition) {
+    if(addr < 237846) {
+      addr = feistel_network_prp(tempKey, addr, numBits);
+      uint8_t *temp = buffer;
+      DecryptData((UINT32 *)tempKey, temp, 2048);
+    }
   }
   
   // end Jdafoe
