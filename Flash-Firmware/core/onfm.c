@@ -255,7 +255,7 @@ int ONFM_Write(unsigned long sector_addr, unsigned long sector_count,
           else {
             PM_NODE_SET_BLOCKPAGE(map_cache[i][PAGE_IN_CLUSTER(addr)], oldBlock, oldPage);
           }
-          uart_printf("cache hit\n");
+      //    uart_printf("cache hit\n");
           goto IN_CACHE;
       }
     }

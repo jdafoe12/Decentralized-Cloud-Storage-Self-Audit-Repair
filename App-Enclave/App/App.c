@@ -20,6 +20,8 @@
 
 #include <string.h>
 
+static long double waitTime = 0;
+
 void ocall_send_parity(int startPage, uint8_t *parityData, size_t size)
 {
     send_data_to_server("send_parity", 12);
@@ -27,7 +29,8 @@ void ocall_send_parity(int startPage, uint8_t *parityData, size_t size)
 	send_data_to_server(&startPage, sizeof(int));
     send_data_to_server(parityData, sizeof(uint8_t) * size);
     usleep(10000000);
-
+    waitTime += (100000 * 4);
+    waitTime +=  10000000;
 }
 
 void ocall_init_parity(int numBits) 
@@ -40,6 +43,7 @@ void ocall_write_partition(int numBits)
 {
     send_data_to_server("write_partition", 16);
     send_data_to_server(&numBits, sizeof(int));
+    waitTime += (100000 * 2);
 }
 
 void ocall_write_page(int pageNum, uint8_t *pageData) 
@@ -47,11 +51,13 @@ void ocall_write_page(int pageNum, uint8_t *pageData)
     send_data_to_server("write_page", 11);
     send_data_to_server(&pageNum, sizeof(int));
     send_data_to_server(pageData, sizeof(uint8_t) * PAGE_SIZE);
+    waitTime += (100000 * 3);
 }
 
 void ocall_end_genPar() 
 {
 	send_data_to_server("end_genPar", 11);
+    waitTime += (100000 * 1);
 }
 
 
@@ -71,6 +77,7 @@ void ocall_send_nonce(uint8_t *nonce)
 
 	/* Send nonce to server */
 	send_data_to_server(nonce, sizeof(uint8_t) * KEY_SIZE);
+    waitTime += (100000 * 2);
 }
 
 void ocall_get_segment(const char *fileName, int segNum, uint8_t *segData, int type) //TODO: make it clear when pages vs segments need to be read.
@@ -90,6 +97,7 @@ void ocall_get_segment(const char *fileName, int segNum, uint8_t *segData, int t
     /* Recieve segData from server */
     uint8_t *temp;
     temp = (uint8_t *) receive_data_from_server(SEGMENT_SIZE);
+    waitTime += (100000 * 5);
 
     if (temp != NULL) {
         memcpy(segData, temp, SEGMENT_SIZE);
@@ -153,19 +161,17 @@ void ocall_get_block(uint8_t *data, size_t segSize, int segPerBlock, int blockNu
 void ocall_ftl_init(uint8_t *sgx_pubKey, uint8_t *ftl_pubKey) 
 {
 
-    int client_fd;
-    struct timeval start_time, end_time;
-    double total_time;
-
     /* Call server function ftl_init */
-    client_fd = create_client_socket();
+    int client_fd = create_client_socket();
     connect_to_server(client_fd);
+    waitTime += (100000 * 1);
     write(client_fd, "ftl_init", 8); /* Specify which function to call in server */
     close(client_fd);
 
     /* Provide input to ftl_init */
     client_fd = create_client_socket();
     connect_to_server(client_fd);
+    waitTime += (100000 * 1);
 	
     write(client_fd, sgx_pubKey, 64); /* Send SGX public key to server */
     close(client_fd);
@@ -175,11 +181,9 @@ void ocall_ftl_init(uint8_t *sgx_pubKey, uint8_t *ftl_pubKey)
     /* Recieve the output of ftl_init */
     client_fd = create_client_socket();
     connect_to_server(client_fd); /* Once server finishes processing, read storage device public key */
+    waitTime += (100000 * 1);
     read(client_fd, ftl_pubKey, 64);
     close(client_fd);
-
-    gettimeofday(&end_time, NULL);
-    total_time = (double)(end_time.tv_sec - start_time.tv_sec) * 1000000 + (end_time.tv_usec - start_time.tv_usec);
 
     /* Print the time taken by the function */
     //printf("ocall_ftl_init took %f microseconds to complete.\n", total_time);
@@ -287,18 +291,21 @@ void app_file_init(sgx_enclave_id_t eid, const char *fileName,  int numBlocks)
 	/* Call file initialization function on server */
 	client_fd = create_client_socket();
     connect_to_server(client_fd);
+    waitTime += (100000 * 1);
 	write(client_fd, "file_init", 9);
 	close(client_fd);
 
     /* Send file name and number of blocks to server function file_init */
 	client_fd = create_client_socket();
 	connect_to_server(client_fd);
+    waitTime += (100000 * 1);
     write(client_fd, fileName, strlen(fileName)); /* Send file Name */
 	close(client_fd);
 
 
 	client_fd = create_client_socket();
 	connect_to_server(client_fd);
+    waitTime += (100000 * 1);
     write(client_fd, &numBlocks, sizeof(numBlocks)); /* Send number of blocks */
 	close(client_fd);
 
@@ -315,6 +322,7 @@ void app_file_init(sgx_enclave_id_t eid, const char *fileName,  int numBlocks)
         /* Send the i-th block to the server */
 		client_fd = create_client_socket();
 		connect_to_server(client_fd);
+        waitTime += (100000 * 1);
 
 		int bytes_sent = 0;
 		int bytes_left = BLOCK_SIZE;
@@ -339,6 +347,7 @@ void app_file_init(sgx_enclave_id_t eid, const char *fileName,  int numBlocks)
         /* Send the i-th sigma to the server */
 		client_fd = create_client_socket();
 		connect_to_server(client_fd);
+        waitTime += (100000 * 1);
         write(client_fd, sigma[i], PRIME_LENGTH / 8);
 		close(client_fd);
     }
@@ -347,12 +356,13 @@ void app_file_init(sgx_enclave_id_t eid, const char *fileName,  int numBlocks)
     /* Send the tag to the server */
 	client_fd = create_client_socket();
 	connect_to_server(client_fd);
+    waitTime += (100000 * 1);
     write(client_fd, tag, sizeof(Tag));
 	close(client_fd);
 
     fclose(file);
 	/* server function file_init has now completed execution, it does not require any more data */
-	printf("generate parity!\n");
+	//printf("generate parity!\n");
     ecall_generate_file_parity(eid, fileNum); // Note: The convention for this call is slightly different than the rest of the file initialization.
                                          // Above, the gennerated data is directly retrurned, rather than written via an ocall, as is done here.
 }
@@ -363,9 +373,10 @@ void app_file_init(sgx_enclave_id_t eid, const char *fileName,  int numBlocks)
 
 int main(void) 
 {
-    //struct timeval start_time, end_time;
-    //double cpu_time_used;
-    //int waittime;
+    struct timeval start_time, end_time;
+    double cpu_time_used;
+    double total_time;
+    //double waittime;
 
     sgx_enclave_id_t eid;
     sgx_status_t ret;
@@ -400,30 +411,37 @@ int main(void)
     int numBlocks = 10;
 
     // Perform file initialization in SGX
-    //gettimeofday(&start_time, NULL);
-    printf("Call file init\n");
-    app_file_init(eid, fileName, numBlocks);
-    //gettimeofday(&end_time, NULL);
-    //waittime = 24;
-    //cpu_time_used = (end_time.tv_sec - start_time.tv_sec) + (end_time.tv_usec - start_time.tv_usec) / 1000000.0;
 
-    //printf("FILE INIT TIME: %f with %d wait time\n", cpu_time_used, waittime);
+    printf("Call file init\n");
+    waitTime = 0; // Set your actual waitTime here if needed
+    gettimeofday(&start_time, NULL);
+    app_file_init(eid, fileName, numBlocks);
+    gettimeofday(&end_time, NULL);
+    cpu_time_used = (end_time.tv_sec - start_time.tv_sec) + (end_time.tv_usec - start_time.tv_usec) / 1000000.0;
+    total_time = cpu_time_used - (waitTime / 1000000.0L);
+    printf("TOTAL FILE INIT TIME (algorithm 2): %f\n", total_time);
 
     int status = 1;
+    waitTime = 0; // Set your actual waitTime here if needed
     printf("Call audit file\n");
-    //gettimeofday(&start_time, NULL);
+    gettimeofday(&start_time, NULL);
     ecall_audit_file(eid, fileName, &status);
-    //gettimeofday(&end_time, NULL);
-    //waittime = 46;
-    //cpu_time_used = (end_time.tv_sec - start_time.tv_sec) + (end_time.tv_usec - start_time.tv_usec) / 1000000.0;
-    //printf("AUDIT TIME: %f with %d wait Time\n", cpu_time_used, waittime);
+    gettimeofday(&end_time, NULL);
+    cpu_time_used = (end_time.tv_sec - start_time.tv_sec) + (end_time.tv_usec - start_time.tv_usec) / 1000000.0;
+    total_time = cpu_time_used - (waitTime / 1000000.0L);
+    printf("TOTAL AUDIT TIME (algorithm 3): %f\n", total_time);
 
     printf("Press enter to repair <enter>\n");
-
     getchar();
 
     printf("Call decode partition\n");
+    waitTime = 0; // Set your actual waitTime here if needed
+    gettimeofday(&start_time, NULL);
     ecall_decode_partition(eid, fileName, 3);
+    gettimeofday(&end_time, NULL);
+    cpu_time_used = (end_time.tv_sec - start_time.tv_sec) + (end_time.tv_usec - start_time.tv_usec) / 1000000.0;
+    total_time = cpu_time_used - (waitTime / 1000000.0L);
+    printf("TOTAL DECODE TIME (algorithm 4): %f\n", total_time);
 
     if(status == 0) {
         printf("SUCCESS!!!\n");

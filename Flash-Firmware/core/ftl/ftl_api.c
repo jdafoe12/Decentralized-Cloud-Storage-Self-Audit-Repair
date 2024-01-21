@@ -488,17 +488,17 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
       genPar =  1;
       uint8_t *temp = buffer;
       numBits = temp[0];
-      uart_printf("genPar = 1\n");
+      //uart_printf("genPar = 1\n");
     } 
     else {
-		uart_printf("genPar = 0\n");
+	//	uart_printf("genPar = 0\n");
       genPar = 0;
     }
   }
   
   if(addr == 237851) { // 951404
     ret = FTL_MAPI_restore();
-    uart_printf("Restore Good! \n");
+  //  uart_printf("Restore Good! \n");
     return ret;
   }
   
@@ -532,12 +532,12 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 		magicNumber[i] = temp[i];
 	  }
 	  if(strcmp("PARITY", magicNumber) == 0) {
-            uart_printf("found magic number\n");
+   //         uart_printf("found magic number\n");
 		loc += 6;
 		// generate groupKey... this _should_ be the only tempKey?
 		hmac_sha1(dh_sharedKey, KEY_SIZE, temp + loc, KEY_SIZE, tempKey, &keySize);
 		loc += KEY_SIZE;
-                uart_printf("mag sha1 done\n");
+    //            uart_printf("mag sha1 done\n");
 
 		// get expected_semiRestricted_writes
                 memcpy(&expected_semiRestricted_writes, temp + loc, sizeof(int));
@@ -557,15 +557,15 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 		//proof = malloc(proofLen);
 		if(proof == NULL) {
 			// Handle error
-                  uart_printf("malloc fail\n");
+    //              uart_printf("malloc fail\n");
 		}
 
 		memcpy(proof, temp + loc, proofLen);
 		loc += proofLen;
 		uint8_t signature[KEY_SIZE];
-                uart_printf("mag sha1 2 start\n");
+    //            uart_printf("mag sha1 2 start\n");
 		hmac_sha1(tempKey, KEY_SIZE, temp, loc, signature, &keySize);
-                uart_printf("mag sha1 2 done\n");
+  //              uart_printf("mag sha1 2 done\n");
 
                 
 		if(memcmp(signature, temp + loc, KEY_SIZE) != 0) {
@@ -575,7 +575,7 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 		}
 		//if() // other fail conditions TODO: Think of any additional fail conditions.
 		prng_init((uint32_t) tempKey[0]);
-                uart_printf("Found magic number done.\n");
+   //             uart_printf("Found magic number done.\n");
 	  }
 	  else if(expected_semiRestricted_writes > current_semiRestricted_writes) {
 		// progressively check proof.
@@ -586,13 +586,13 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
 			return STATUS_SUCCESS; // TODO: think if this is really all that needs to be done on fail. There is an implicit failsafe... no comm with TEE here.
 		}
                 
-                uart_printf("checking...\n");
+    //            uart_printf("checking...\n");
 
 
 		int randLen = secretLen * log2((2048 * 8) / secretLen);
-                uart_printf("malloc\n");
+ //               uart_printf("malloc\n");
 		uint8_t *pageRand = (uint8_t *) malloc(secretLen * sizeof(uint8_t));
-                uart_printf("end malloc\n");
+  //              uart_printf("end malloc\n");
                 for(int l = 0; l < secretLen; l++) {
                   pageRand[l] = 0;
                 }
@@ -669,7 +669,7 @@ STATUS FTL_Write(PGADDR addr, void* buffer) {
       }
     }
   }
-  uart_printf("write done\n");
+ // uart_printf("write done\n");
   return ret;
 }
 

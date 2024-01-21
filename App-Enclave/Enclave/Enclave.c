@@ -358,10 +358,10 @@ int audit_block_group(int fileNum, int numBlocks, int *blockNums, BIGNUM **sigma
 
     uint8_t sigs[PRIME_LENGTH / 8];
     BN_bn2bin(sigma, sigs);
-    ocall_printf("SIGMA (1 and 2): ", 18, 0);
-    ocall_printf(sigs, PRIME_LENGTH / 8, 1);
+    //ocall_printf("SIGMA (1 and 2): ", 18, 0);
+    //ocall_printf(sigs, PRIME_LENGTH / 8, 1);
     BN_bn2bin(sigma2, sigs);
-    ocall_printf(sigs, PRIME_LENGTH / 8, 1);
+    //ocall_printf(sigs, PRIME_LENGTH / 8, 1);
 
     int result = BN_cmp(sigma, sigma2);
 
@@ -399,12 +399,12 @@ void code_data(int *symbolData, int blocksInGroup, int type)
 	int totalSymbols = numDataSymbols + nroots;
 	int numParityBlocks = ceil( (double) (nroots * bytesPerSymbol) / BLOCK_SIZE); // TODO: * bytesPerSymbols??
 
-	ocall_printint(&blocksInGroup);
-	ocall_printint(&groupByteSize);
-	ocall_printint(&bytesPerSymbol);
-	ocall_printint(&numDataSymbols);
-	ocall_printint(&nroots);
-	ocall_printint(&numParityBlocks);
+	//ocall_printint(&blocksInGroup);
+	//ocall_printint(&groupByteSize);
+	// ocall_printint(&bytesPerSymbol);
+	// ocall_printint(&numDataSymbols);
+	// ocall_printint(&nroots);
+	// ocall_printint(&numParityBlocks);
 
 	void *rs = init_rs_int(symSize, gfpoly, fcr, prim, nroots, pow(2, symSize) - (totalSymbols + 1));
 
@@ -610,11 +610,11 @@ void ecall_generate_file_parity(int fileNum)
 		// TODO: a lot of repeated code between audit_file and here. This is the same between audit_block_group, and audit_file.
 		// Much of this can be refactored to work really well.
 
-		if (audit_block_group(fileNum, blocksInGroup, groups[group], sigmas, tag, groupData) != 0) {
-		    ocall_printf("AUDIT FAILED!!", 15, 0);
-		} else {
-		    ocall_printf("AUDIT SUCCESS!", 15, 0);
-		}
+		//if (audit_block_group(fileNum, blocksInGroup, groups[group], sigmas, tag, groupData) != 0) {
+		//    ocall_printf("AUDIT FAILED!!", 15, 0);
+		//} else {
+		//    ocall_printf("AUDIT SUCCESS!", 15, 0);
+		//}
 
 
 		// Setup RS parameters
@@ -648,7 +648,7 @@ void ecall_generate_file_parity(int fileNum)
 
 		//ocall_printf("parity just after encode:", 26, 0);
 
-		ocall_printf(symbolData, totalSymbols * sizeof(int), 1);
+		//ocall_printf(symbolData, totalSymbols * sizeof(int), 1);
 		
 
 		//ocall_printf("decode?", 8, 0);
@@ -859,7 +859,7 @@ void ecall_generate_file_parity(int fileNum)
 
 
     }
-	ocall_printf("Parity Done", 12, 0);
+	//ocall_printf("Parity Done", 12, 0);
 	
 	ocall_init_parity(numBits);
 	//ocall_end_genPar();
@@ -1058,7 +1058,7 @@ void ecall_decode_partition(const char *fileName, int blockNum)
 
 // for(int i = 0; i < numParityBlocks; i++) {
      int out_len;
-    ocall_printf("Decrypt", 8, 0);
+    //ocall_printf("Decrypt", 8, 0);
     if (!EVP_DecryptUpdate(ctx, parityData, &out_len, parityData, BLOCK_SIZE * numParityBlocks)) { // in place decryption
         // Handle error: Encryption Update failed
         EVP_CIPHER_CTX_free(ctx);
@@ -1096,15 +1096,15 @@ for (int currentSymbol = 0; currentSymbol < nroots; currentSymbol++) {
 
 //ocall_printf(symbolData + numDataSymbols, nroots * sizeof(int), 1);
 
-	ocall_printf(symbolData, totalSymbols * sizeof(int), 1);
+	//ocall_printf(symbolData, totalSymbols * sizeof(int), 1);
 
 	// all symbols now in symboldata. decode.
 
-    ocall_printf("HERE0", 6, 0);
+    //ocall_printf("HERE0", 6, 0);
 
 	code_data(symbolData, blocksInGroup, 1);
 
-	ocall_printf("HERE1", 6, 0);
+	//ocall_printf("HERE1", 6, 0);
 
 	//free_rs_int(rs);
 
@@ -1129,11 +1129,11 @@ for (int currentSymbol = 0; currentSymbol < nroots; currentSymbol++) {
 	// TODO: make procedures be pretty much same as in paper?
 	// TODO: add this ecall to enclave.edl
 
-	ocall_printf("HERE2", 6, 0);
+	//ocall_printf("HERE2", 6, 0);
 
 	ocall_write_partition(numBits);
 
-	ocall_printf("HERE3", 6, 0);
+	//ocall_printf("HERE3", 6, 0);
 
 	for(int i = 0; i < maxBlocksPerGroup; i++) {
 
@@ -1638,12 +1638,12 @@ void ecall_audit_file(const char *fileName, int *ret)
 	BN_mod_add(sigma2, sum1, sum2, bprime, ctx);
 	BN_CTX_end(ctx);
 
-	uint8_t sigs[PRIME_LENGTH / 8];
-	BN_bn2bin(sigma, sigs);
-	ocall_printf("SIGMA (1 and 2): ", 18, 0);
-	ocall_printf(sigs, PRIME_LENGTH / 8, 1);
-	BN_bn2bin(sigma2, sigs);
-	ocall_printf(sigs, PRIME_LENGTH / 8, 1);
+	//uint8_t sigs[PRIME_LENGTH / 8];
+	//BN_bn2bin(sigma, sigs);
+	//ocall_printf("SIGMA (1 and 2): ", 18, 0);
+	//ocall_printf(sigs, PRIME_LENGTH / 8, 1);
+	//BN_bn2bin(sigma2, sigs);
+	//ocall_printf(sigs, PRIME_LENGTH / 8, 1);
 
 	// Compare the two calculations
 	*ret = BN_cmp(sigma, sigma2);
