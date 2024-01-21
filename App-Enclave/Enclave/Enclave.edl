@@ -25,9 +25,11 @@ enclave {
 
 		void ocall_printf([in, count=size] unsigned char *buffer, size_t size, int type);
 
+		void ocall_printint([in, count=1] int *buffer);
+
 		void ocall_send_nonce([in, count=16] uint8_t *nonce);
 
-		void ocall_get_segment([in, string] const char *fileName, int segNum,[out, size=SEGMENT_SIZE] uint8_t *segData);
+		void ocall_get_segment([in, string] const char *fileName, int segNum,[out, size=SEGMENT_SIZE] uint8_t *segData, int type);
 
 		void ocall_init_parity(int numBits);
 

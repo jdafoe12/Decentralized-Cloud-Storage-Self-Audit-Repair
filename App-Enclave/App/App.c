@@ -26,6 +26,7 @@ void ocall_send_parity(int startPage, uint8_t *parityData, size_t size)
 	send_data_to_server(&size, sizeof(size_t));
 	send_data_to_server(&startPage, sizeof(int));
     send_data_to_server(parityData, sizeof(uint8_t) * size);
+    usleep(10000000);
 
 }
 
@@ -72,7 +73,7 @@ void ocall_send_nonce(uint8_t *nonce)
 	send_data_to_server(nonce, sizeof(uint8_t) * KEY_SIZE);
 }
 
-void ocall_get_segment(const char *fileName, int segNum, uint8_t *segData) //TODO: make it clear when pages vs segments need to be read.
+void ocall_get_segment(const char *fileName, int segNum, uint8_t *segData, int type) //TODO: make it clear when pages vs segments need to be read.
 {
 
     /* Call server function get_segment */
@@ -83,6 +84,9 @@ void ocall_get_segment(const char *fileName, int segNum, uint8_t *segData) //TOD
 
     /* Send segNum to server*/
     send_data_to_server(&segNum, sizeof(int));
+
+    send_data_to_server(&type, sizeof(int));
+
     /* Recieve segData from server */
     uint8_t *temp;
     temp = (uint8_t *) receive_data_from_server(SEGMENT_SIZE);
@@ -204,6 +208,15 @@ void ocall_printf(unsigned char *buffer, size_t size, int type)
 		}
 		printf("\n");
 	}
+	
+
+}
+
+void ocall_printint(int *buffer) 
+{
+
+	printf("%d\n",*buffer);
+
 	
 
 }
@@ -404,6 +417,13 @@ int main(void)
     //waittime = 46;
     //cpu_time_used = (end_time.tv_sec - start_time.tv_sec) + (end_time.tv_usec - start_time.tv_usec) / 1000000.0;
     //printf("AUDIT TIME: %f with %d wait Time\n", cpu_time_used, waittime);
+
+    printf("Press enter to repair <enter>\n");
+
+    getchar();
+
+    printf("Call decode partition\n");
+    ecall_decode_partition(eid, fileName, 3);
 
     if(status == 0) {
         printf("SUCCESS!!!\n");
