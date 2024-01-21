@@ -1153,6 +1153,7 @@ for (int currentSymbol = 0; currentSymbol < nroots; currentSymbol++) {
 		}
 	}
 	ocall_write_partition(numBits);
+	ocall_printf("HERE4", 6, 0);
 
 
 }

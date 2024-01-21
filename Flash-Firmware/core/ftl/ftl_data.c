@@ -278,7 +278,7 @@ STATUS DATA_Reclaim(BOOL is_hot) {
           continue;
         }
 
-        if (block_dirty_table[i] == target_dirty_count && block_state[i] == 2) {
+        if (block_dirty_table[i] == target_dirty_count && ((block_state[i] == 2) || (block_state[i] == 0))) {
           block_state[i] = 0;
           dirty_blocks[found_block] = i;
           total_valid_page += (MAX_DIRTY_PAGES - block_dirty_table[i]);
