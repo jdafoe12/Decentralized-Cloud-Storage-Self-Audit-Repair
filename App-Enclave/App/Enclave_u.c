@@ -26,6 +26,10 @@ typedef struct ms_ecall_decode_partition_t {
 	int ms_blockNum;
 } ms_ecall_decode_partition_t;
 
+typedef struct ms_ocall_get_time_t {
+	uint64_t* ms_outTime;
+} ms_ocall_get_time_t;
+
 typedef struct ms_ocall_ftl_init_t {
 	uint8_t* ms_sgx_pubKey;
 	uint8_t* ms_ftl_pubKey;
@@ -122,6 +126,14 @@ typedef struct ms_pthread_wakeup_ocall_t {
 	int ms_retval;
 	unsigned long long ms_waiter;
 } ms_pthread_wakeup_ocall_t;
+
+static sgx_status_t SGX_CDECL Enclave_ocall_get_time(void* pms)
+{
+	ms_ocall_get_time_t* ms = SGX_CAST(ms_ocall_get_time_t*, pms);
+	ocall_get_time(ms->ms_outTime);
+
+	return SGX_SUCCESS;
+}
 
 static sgx_status_t SGX_CDECL Enclave_ocall_ftl_init(void* pms)
 {
@@ -276,10 +288,11 @@ static sgx_status_t SGX_CDECL Enclave_pthread_wakeup_ocall(void* pms)
 
 static const struct {
 	size_t nr_ocall;
-	void * table[19];
+	void * table[20];
 } ocall_table_Enclave = {
-	19,
+	20,
 	{
+		(void*)Enclave_ocall_get_time,
 		(void*)Enclave_ocall_ftl_init,
 		(void*)Enclave_ocall_get_block,
 		(void*)Enclave_ocall_printf,

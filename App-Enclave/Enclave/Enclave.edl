@@ -17,7 +17,7 @@ enclave {
 
 	untrusted {
 
-
+		void ocall_get_time([out] uint64_t *outTime);
 
 		void ocall_ftl_init([in, count=64] uint8_t *sgx_pubKey, [out,count=64] uint8_t *ftl_pubKey);
 

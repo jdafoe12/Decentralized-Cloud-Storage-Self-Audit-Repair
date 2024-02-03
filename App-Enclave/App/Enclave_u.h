@@ -17,6 +17,10 @@
 extern "C" {
 #endif
 
+#ifndef OCALL_GET_TIME_DEFINED__
+#define OCALL_GET_TIME_DEFINED__
+void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_get_time, (uint64_t* outTime));
+#endif
 #ifndef OCALL_FTL_INIT_DEFINED__
 #define OCALL_FTL_INIT_DEFINED__
 void SGX_UBRIDGE(SGX_NOCONVENTION, ocall_ftl_init, (uint8_t* sgx_pubKey, uint8_t* ftl_pubKey));

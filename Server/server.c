@@ -6,7 +6,7 @@
  */
 
 #define _GNU_SOURCE
-#define PATH "/dev/sdb"
+#define PATH "/dev/sdc"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -18,6 +18,11 @@
 #include "scom.h"
 #include "defs.h"
 #include <time.h>
+
+void send_ack(int client_fd) {
+ char ack[] = "ACK";
+ write(client_fd, ack, sizeof(ack));
+}
 
 void ftl_initial(uint8_t *sgx_pubKey, uint8_t *ftl_pubKey) 
 {
@@ -37,9 +42,6 @@ void ftl_initial(uint8_t *sgx_pubKey, uint8_t *ftl_pubKey)
  return;
  }
 
- //printf("start KS\n");
- //struct timeval start_time, end_time;
- //gettimeofday(&start_time, NULL);
  memcpy(buf, sgx_pubKey, 64);
  if (pwrite(fd, buf, 512, offset) == -1) {
  perror("[pwrite]");
@@ -49,17 +51,6 @@ void ftl_initial(uint8_t *sgx_pubKey, uint8_t *ftl_pubKey)
  }
 
  fdatasync(fd);
- //printf("end KS\n");
-
- //gettimeofday(&end_time, NULL);
- //long int elapsed_time_KS_sec = end_time.tv_sec - start_time.tv_sec;
- //long int elapsed_time_KS_micro = end_time.tv_usec - start_time.tv_usec;
- //if (elapsed_time_KS_micro < 0) {
- // elapsed_time_KS_micro += 1000000;
- // elapsed_time_KS_sec--;
- //}
- //printf("Elapsed time: %ld.%06ld seconds\n", elapsed_time_KS_sec, elapsed_time_KS_micro);
-
 
  // Read FTL public key from device
  if(lseek(fd, offset, SEEK_SET) == -1) {
@@ -73,6 +64,8 @@ void ftl_initial(uint8_t *sgx_pubKey, uint8_t *ftl_pubKey)
  close(fd);
  return;
  }
+
+ fsync(fd);
 
  memcpy(ftl_pubKey, buf, 64);
 
@@ -88,6 +81,7 @@ void get_challnum(int server_fd)
 
  client_fd = accept_connection(server_fd);
  read(client_fd, challnum, KEY_SIZE);
+ send_ack(client_fd);
  close(client_fd);
  // for(int i = 0; i < KEY_SIZE; i++) {
  // printf("%X", challnum[i]);
@@ -109,8 +103,7 @@ void get_challnum(int server_fd)
  return;
  }
 
- //struct timeval start, end;
- //gettimeofday(&start, NULL);
+
  memcpy(buf, challnum, KEY_SIZE);
  if (pwrite(fd, buf, 512, offset) == -1) { 
  perror("[pwrite]");
@@ -119,19 +112,14 @@ void get_challnum(int server_fd)
  return -1;
  }
 
- fsync(fd);
+ fdatasync(fd);
 
- //gettimeofday(&end, NULL);
- //long seconds = end.tv_sec - start.tv_sec;
- //long micros = ((seconds * 1000000) + end.tv_usec) - (start.tv_usec);
-
- //printf("Time elapsed Give challNum: %ld.%06ld seconds\n", seconds, micros);
 
 }
 
 void get_segment(int server_fd) 
 {
-
+usleep(200000);
  int client_fd;
  uint8_t segData[SEGMENT_SIZE];
  uint8_t buffer[BUFFER_SIZE];
@@ -139,6 +127,7 @@ void get_segment(int server_fd)
  /* Recieve fileName */
  client_fd = accept_connection(server_fd);
  int fileNameLen = read(client_fd, buffer, FILE_NAME_LEN);
+ send_ack(client_fd);
  close(client_fd);
 
  char fileName[fileNameLen+1];
@@ -149,6 +138,7 @@ void get_segment(int server_fd)
  int segNum;
  client_fd = accept_connection(server_fd);
  read(client_fd, &segNum, sizeof(int));
+ send_ack(client_fd);
  close(client_fd);
  //printf("Segment number recieved: %d\n", segNum);
  /* Open device */
@@ -169,6 +159,7 @@ void get_segment(int server_fd)
  int type;
  client_fd = accept_connection(server_fd);
  read(client_fd, &type, sizeof(int));
+ send_ack(client_fd);
  close(client_fd);
 
  if(type == 0) {
@@ -179,17 +170,19 @@ void get_segment(int server_fd)
  return;
  }
  
-
+//printf("segNum: %d\n", segNum);
  memcpy(buf, &segNum, sizeof(segNum));
  if (write(fd, buf, SEGMENT_SIZE) == -1) {
  perror("[write]");
  close(fd);
  return;
  }
+
+ fsync(fd);
  }
 
- //struct timeval start, end;
- //gettimeofday(&start, NULL);
+
+
 
  if (pread(fd, buf, SEGMENT_SIZE, offset) == -1) { 
  perror("[pread]");
@@ -199,13 +192,8 @@ void get_segment(int server_fd)
  }
 
  fsync(fd);
-
- //gettimeofday(&end, NULL);
- //long seconds = end.tv_sec - start.tv_sec;
- //long micros = ((seconds * 1000000) + end.tv_usec) - (start.tv_usec);
-
- //printf("Time elapsed Get segment: %ld.%06ld seconds\n", seconds, micros);
-
+ close(fd);
+ 
 
  memcpy(segData, buf, SEGMENT_SIZE);
 
@@ -215,7 +203,7 @@ void get_segment(int server_fd)
  // }
  // printf("\n");
 
- close(fd);
+
 
  /* Send data at segNum */
  client_fd = accept_connection(server_fd);
@@ -228,6 +216,8 @@ void get_segment(int server_fd)
  }
  total_sent += sent;
  }
+ char ack[4];
+ read(client_fd, ack, 4);
  close(client_fd);
 
 }
@@ -241,113 +231,151 @@ void file_init(int server_fd)
 
  // Open storage device. ASSUME 1 File for now
  int fd; 
- if((fd = open(PATH, O_RDWR)) == -1) { // For now do not do O_DIRECT. This is not in reserved area. A simple write
+ if((fd = open(PATH, O_RDWR | O_DIRECT)) == -1) { // For now do not do O_DIRECT. This is not in reserved area. A simple write
  perror("[open]");
  return;
  }
 
+void *buf;
+ if (posix_memalign(&buf, SEGMENT_SIZE, BLOCK_SIZE) != 0) {
+ perror("[posix_memalign]");
+ close(fd);
+ return;
+ }
  
  // Receive file name
  client_fd = accept_connection(server_fd);
  int fileNameLen = read(client_fd, buffer, FILE_NAME_LEN);
+ send_ack(client_fd);
  close(client_fd);
 
  char fileName[fileNameLen+1];
  strncpy(fileName, buffer, fileNameLen);
  fileName[fileNameLen] = '\0';
 
+ printf("File name: %s\n", fileName);
+
  // Receive number of blocks
  int numParityBlocks;
 
  client_fd = accept_connection(server_fd);
  read(client_fd, &numParityBlocks, sizeof(numParityBlocks));
+ send_ack(client_fd);
  close(client_fd);
+ printf("Number of blocks: %d\n", numParityBlocks);
 
 
  // Receive each block
  uint8_t blockData[BLOCK_SIZE];
  for (int i = 0; i < numParityBlocks; i++) {
 
+
+ for (int j = 0; j < 8; j++) {
  client_fd = accept_connection(server_fd);
- int bytes_received = 0;
- int bytes_left = BLOCK_SIZE;
- while (bytes_left > 0) {
- int bytes_read = read(client_fd, blockData + bytes_received, bytes_left);
- if (bytes_read < 0) {
- // handle error
- } else if (bytes_read == 0) {
- // handle disconnection
+ ssize_t total_read = 0;
+ ssize_t bytes_read;
+ char* buffer_ptr = blockData + (SEGMENT_SIZE * j);
+
+ while (total_read < SEGMENT_SIZE) {
+ bytes_read = read(client_fd, buffer_ptr + total_read, SEGMENT_SIZE - total_read);
+ if (bytes_read <= 0) {
+ if (bytes_read == 0) {
+ printf("Client disconnected, segment %d partially received\n", j);
  } else {
- bytes_received += bytes_read;
- bytes_left -= bytes_read;
+ perror("Read error");
  }
+ close(client_fd);
+ exit(EXIT_FAILURE); // Or handle the error as appropriate
  }
- // printf("Block %d received successfully\n", i);
+ total_read += bytes_read;
+ }
+ printf("Segment %d received successfully\n", j);
+
+ // Send acknowledgment to client
+ send_ack(client_fd);
 
  close(client_fd);
+ }
+
+
  
- // Write block to storage device
- if(write(fd, blockData, BLOCK_SIZE) == -1) {
+ printf("Block %d received successfully\n", i);
+
+ // Write block to storage device 
+ memset(buf, 0, BLOCK_SIZE);
+ memcpy(buf, blockData, BLOCK_SIZE); // not sure this is right
+ if(write(fd, buf, BLOCK_SIZE) == -1) {
  perror("[write]");
  close(fd);
  return;
  }
+ 
  }
+
+printf("Blocks written successfully\n");
 
  // Receive each sigma
  uint8_t sigma[numParityBlocks][PRIME_LENGTH / 8];
  const int bytesPerSeg = 512;
  const int sigPerSeg = (bytesPerSeg) / (PRIME_LENGTH / 8);
  int sigCount = 0;
- for (int i = 0; i < numParityBlocks; i++) {
- 
+for (int i = 0; i < numParityBlocks; i++) {
  client_fd = accept_connection(server_fd);
 
- if (read(client_fd, sigma[i], PRIME_LENGTH / 8) != PRIME_LENGTH / 8) {
+ ssize_t total_read = 0;
+ ssize_t bytes_read;
+ while (total_read < PRIME_LENGTH / 8) {
+ bytes_read = read(client_fd, sigma[i] + total_read, (PRIME_LENGTH / 8) - total_read);
+ if (bytes_read <= 0) {
+ if (bytes_read == 0) {
+ printf("Client disconnected before sending complete data\n");
+ } else {
  perror("failed to read sigma");
- exit(EXIT_FAILURE);
  }
  close(client_fd);
-
- /* Write sigma to storage device */
- if (write(fd, sigma[i], PRIME_LENGTH / 8) == -1) {
- perror("[write]");
- close(fd);
- return;
+ exit(EXIT_FAILURE); // Or handle the error as appropriate
  }
+ total_read += bytes_read;
+ }
+
+ // Send acknowledgment to client
+ send_ack(client_fd);
+ printf("Sigma %d received successfully\n", i);
+
+ close(client_fd);
  sigCount++;
+}
 
- if (sigCount % sigPerSeg == 0) {
- // Calculate the number of bytes to write to fill the current segment
- int bytesWritten = (sigCount * (PRIME_LENGTH / 8));
- int bytesToFillSeg = bytesPerSeg - (bytesWritten % bytesPerSeg);
- if (bytesToFillSeg != bytesPerSeg) {
- uint8_t buffer[bytesToFillSeg];
- memset(buffer, 0, bytesToFillSeg);
- if (write(fd, buffer, bytesToFillSeg) == -1) {
+
+for(int i = 0; i < ceil((double) sigCount / sigPerSeg); i++) {
+int sigIndex = 0;
+
+memset(buf, 0, SEGMENT_SIZE);
+while (sigIndex < sigCount) {
+// Load sigmas into buf
+for (int i = 0; i < sigPerSeg; i++) {
+ if (sigIndex >= sigCount) {
+ break;
+ }
+ 
+ memcpy(buf + (i * (PRIME_LENGTH / 8)), sigma[sigIndex], PRIME_LENGTH / 8);
+ sigIndex++;
+}
+
+// Write segment from buf
+//printf("Writing segment %d\n", i);
+if (write(fd, buf, bytesPerSeg) == -1) {
  perror("[write]");
  close(fd);
  return;
- }
- }
- }
- }
+}
+fdatasync(fd);
+//printf("Done writing segment %d\n", i);
 
- // Seek to next 512 byte segment
- off_t pos = lseek(fd, 0, SEEK_CUR);
- if (pos == -1) {
- perror("[lseek]");
- close(fd);
- return;
- }
- off_t nextSegStart = ((pos / bytesPerSeg) + 1) * bytesPerSeg;
- off_t bytesToSkip = nextSegStart - pos;
- if (lseek(fd, bytesToSkip, SEEK_CUR) == -1) {
- perror("[lseek]");
- close(fd);
- return;
- }
+}
 
+
+}
 
  // Receive the tag
  Tag tag;
@@ -358,14 +386,35 @@ void file_init(int server_fd)
  perror("failed to read tag");
  exit(EXIT_FAILURE);
  }
+ send_ack(client_fd);
  close(client_fd);
- 
+ printf("Tag received successfully\n");
+ printf("tag size: %d\n", sizeof(Tag));
+ memset(buf, 0, BLOCK_SIZE);
+
+ memcpy(buf, &tag, sizeof(Tag));
+
+ for(int i = 0; i < sizeof(Tag); i++) {
+ uint8_t *byte = buf;
+ printf("%X", byte[i]);
+ }
+ printf("\n");
+ printf("\n");
+
+for(int i = 0; i < SEGMENT_PER_BLOCK; i ++) {
+ for(int j = 0; j < PRIME_LENGTH / 8; j++)
+ printf("%X", tag.alpha[i][j]);
+}
+ //printf("Tag copied to buffer\n");
  // Write tag to storage device.
- if (write(fd, &tag, sizeof(tag)) == -1) {
+
+ if (write(fd, buf, SEGMENT_SIZE) == -1) {
  perror("[write]");
  close(fd);
  return;
  }
+ //printf("Tag written successfully\n");
+ fdatasync(fd);
 
  return 0;
 }
@@ -379,6 +428,7 @@ void ftl_init(int server_fd)
  /* Read SGX public key from server*/
  client_fd = accept_connection(server_fd);
  read(client_fd, sgx_pubKey, sizeof(uint8_t) * 64);
+ send_ack(client_fd);
  close(client_fd);
 
 
@@ -387,7 +437,10 @@ void ftl_init(int server_fd)
 
  client_fd = accept_connection(server_fd);
  write(client_fd, ftl_pubKey, sizeof(uint8_t) * 64);
+ uint8_t ack[4];
+ read(client_fd, ack, 4);
  close(client_fd);
+
 
  free(ftl_pubKey);
 }
@@ -400,6 +453,7 @@ void state_2(int server_fd)
 
  client_fd = accept_connection(server_fd);
  int len = read(client_fd, &numBits, sizeof(int));
+ send_ack(client_fd);
  close(client_fd);
 
  int fd;
@@ -452,6 +506,7 @@ void receive_parity(int server_fd) {
  close(fd);
  return;
  }
+ send_ack(client_fd);
  close(client_fd);
 
  // Align buffer to 2048 bytes
@@ -472,6 +527,7 @@ void receive_parity(int server_fd) {
  close(fd);
  return;
  }
+ send_ack(client_fd);
  close(client_fd);
 
  //printf("start page: %d\n", startPage);
@@ -491,6 +547,7 @@ void receive_parity(int server_fd) {
  }
  bytes_received += bytes_read;
  }
+ send_ack(client_fd);
  close(client_fd);
 
  if (lseek(fd, (startPage) * 2048, SEEK_SET) == -1) {
@@ -519,7 +576,7 @@ void receive_parity(int server_fd) {
  
  for (int i = 0; i < (size / 4096) - 1; i++) {
  for (int j = 0; j < 2; j++) {
- usleep(1000000);
+ //usleep(1000000);
  size_t offset = 4096 + (4096 * i) + (2048 * j);
  if (offset + 2048 <= size) {
  if (write(fd, buffer + offset, 2048) == -1) {
@@ -567,6 +624,7 @@ void end_genPar(int server_fd) {
  close(fd);
  return;
  }
+ fdatasync(fd);
  
 }
 
@@ -577,6 +635,7 @@ void write_partition(int server_fd) {
 
  client_fd = accept_connection(server_fd);
  int len = read(client_fd, &numBits, sizeof(int));
+ send_ack(client_fd);
  close(client_fd);
 
  int fd;
@@ -606,6 +665,7 @@ void write_partition(int server_fd) {
  close(fd);
  return;
  }
+ fdatasync(fd);
 
 }
 
@@ -634,6 +694,7 @@ void write_page(int server_fd) {
  close(fd);
  return;
  }
+ send_ack(client_fd);
  close(client_fd);
 
  //printf("start page: %d\n", startPage);
@@ -653,6 +714,7 @@ void write_page(int server_fd) {
  }
  bytes_received += bytes_read;
  }
+ send_ack(client_fd);
  close(client_fd);
 
  if (lseek(fd, (pageNum) * 2048, SEEK_SET) == -1) {
@@ -682,6 +744,7 @@ main()
  while(1) {
  client_fd = accept_connection(server_fd);
  int stringLen = read(client_fd, buffer, FILE_NAME_LEN);
+ send_ack(client_fd);
  close(client_fd);
  char command[stringLen+1];
  strncpy(command, buffer, stringLen);

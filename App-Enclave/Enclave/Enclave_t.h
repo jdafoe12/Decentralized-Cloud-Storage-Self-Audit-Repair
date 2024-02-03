@@ -22,6 +22,7 @@ void ecall_audit_file(const char* fileName, int* ret);
 void ecall_generate_file_parity(int fileNum);
 void ecall_decode_partition(const char* fileName, int blockNum);
 
+sgx_status_t SGX_CDECL ocall_get_time(uint64_t* outTime);
 sgx_status_t SGX_CDECL ocall_ftl_init(uint8_t* sgx_pubKey, uint8_t* ftl_pubKey);
 sgx_status_t SGX_CDECL ocall_get_block(uint8_t* data, size_t segSize, int segPerBlock, int blockNum, char* fileName);
 sgx_status_t SGX_CDECL ocall_printf(unsigned char* buffer, size_t size, int type);

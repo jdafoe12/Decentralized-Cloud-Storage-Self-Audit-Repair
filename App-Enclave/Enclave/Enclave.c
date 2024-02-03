@@ -38,9 +38,11 @@ uint8_t dh_sharedKey[ECC_PUB_KEY_SIZE];
 PorSK porSK;
 File files[MAX_FILES];
 
+static BIGNUM *testFile[SEGMENT_PER_BLOCK * 10];
+
 #ifdef TEST_MODE
 
-static BIGNUM *testFile[SEGMENT_PER_BLOCK * 10];
+
 static BIGNUM *testPrime;
 static BIGNUM *testSigmas[10];
 static BIGNUM *testCoefficients[5];
@@ -358,10 +360,10 @@ int audit_block_group(int fileNum, int numBlocks, int *blockNums, BIGNUM **sigma
 
     uint8_t sigs[PRIME_LENGTH / 8];
     BN_bn2bin(sigma, sigs);
-    //ocall_printf("SIGMA (1 and 2): ", 18, 0);
-    //ocall_printf(sigs, PRIME_LENGTH / 8, 1);
+    ocall_printf("SIGMA (1 and 2): ", 18, 0);
+    ocall_printf(sigs, PRIME_LENGTH / 8, 1);
     BN_bn2bin(sigma2, sigs);
-    //ocall_printf(sigs, PRIME_LENGTH / 8, 1);
+    ocall_printf(sigs, PRIME_LENGTH / 8, 1);
 
     int result = BN_cmp(sigma, sigma2);
 
@@ -455,12 +457,15 @@ void ecall_generate_file_parity(int fileNum)
     int segNum = 0;
     int maxBlocksPerGroup = ceil(numBlocks / numGroups);
     int blocksInGroup = 0;
+	ocall_printint(&numGroups);
 
 	uint8_t segData[SEGMENT_SIZE];
     uint8_t groupData[maxBlocksPerGroup * SEGMENT_PER_BLOCK * SEGMENT_SIZE];
 
 	int startPage = 0; // TODO: This should start at start of parity for file in FTL. This can be calculated based on defined values and data in files struct.
     for (int group = 0; group < numGroups; group++) {
+		//ocall_printf("group:", 6, 0);
+		//ocall_printint(&group);
 
 		/* 
      	 * porSK.sortKey is the PRP key to get the group. Need different keys for each file??
@@ -610,11 +615,11 @@ void ecall_generate_file_parity(int fileNum)
 		// TODO: a lot of repeated code between audit_file and here. This is the same between audit_block_group, and audit_file.
 		// Much of this can be refactored to work really well.
 
-		//if (audit_block_group(fileNum, blocksInGroup, groups[group], sigmas, tag, groupData) != 0) {
-		//    ocall_printf("AUDIT FAILED!!", 15, 0);
-		//} else {
-		//    ocall_printf("AUDIT SUCCESS!", 15, 0);
-		//}
+		if (audit_block_group(fileNum, blocksInGroup, groups[group], sigmas, tag, groupData) != 0) {
+		    ocall_printf("AUDIT FAILED!!", 15, 0);
+		} else {
+		    ocall_printf("AUDIT SUCCESS!", 15, 0);
+		}
 
 
 		// Setup RS parameters
@@ -1008,12 +1013,12 @@ void ecall_decode_partition(const char *fileName, int blockNum)
         int totalSymbols = numDataSymbols + nroots;
 		int numParityBlocks = ceil( (double) (nroots * bytesPerSymbol) / BLOCK_SIZE); // TODO: * bytesPerSymbols??
 
-		ocall_printint(&blocksInGroup);
-		ocall_printint(&groupByteSize);
-		ocall_printint(&bytesPerSymbol);
-		ocall_printint(&numDataSymbols);
-		ocall_printint(&nroots);
-		ocall_printint(&numParityBlocks);
+		//ocall_printint(&blocksInGroup);
+		//ocall_printint(&groupByteSize);
+		//ocall_printint(&bytesPerSymbol);
+		//ocall_printint(&numDataSymbols);
+		//ocall_printint(&nroots);
+		//ocall_printint(&numParityBlocks);
 
 
 	int* symbolData = (int*)malloc(totalSymbols * sizeof(int));
@@ -1153,7 +1158,7 @@ for (int currentSymbol = 0; currentSymbol < nroots; currentSymbol++) {
 		}
 	}
 	ocall_write_partition(numBits);
-	ocall_printf("HERE4", 6, 0);
+	ocall_printf("Decode Done", 12, 0);
 
 
 }
@@ -1214,19 +1219,18 @@ int ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBlock
     int i, j;
     uint8_t blockNum;
     BIGNUM *prime;
+    uint8_t *data = (uint8_t *)malloc(BLOCK_SIZE * sizeof(uint8_t)); /// Block data.
 
-    uint8_t *data = (uint8_t *)malloc(BLOCK_SIZE * sizeof(uint8_t));
 
-
-    for(i = 0; i < MAX_FILES; i++) { // TODO: This maybe should loop through MAX_FILES? it was FILE_NAME_LEN
+    for(i = 0; i < MAX_FILES; i++) {
         if(files[i].inUse == 0) {
-            memcpy(files[i].fileName, fileName, strlen(fileName)); // TODO: change inUse to 1 here?? the line was not here.
+            memcpy(files[i].fileName, fileName, strlen(fileName));
 			files[i].inUse = 1;
             break;
         }
     } // TODO: rename i to fileNum
 	files[i].numBlocks = numBlocks;
-	files[i].numGroups = 2; // TODO: Come up with some function to determine this value for a given file. For now, it is hardcoded.
+	files[i].numGroups = NUM_GROUPS; // TODO: Come up with some function to determine this value for a given file. For now, it is hardcoded.
 
 
 	// Generate prime number and key asssotiated with the file
@@ -1269,6 +1273,7 @@ int ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBlock
         BN_bin2bn(tag->alpha[j], PRIME_LENGTH / 8, alpha_bn[j]);
 
 		// JD_test
+		//ocall_printf("alpha:", 6,0);
 		//ocall_printf(tag->alpha[j], PRIME_LENGTH / 8, 1);
 		#ifdef TEST_MODE
 		
@@ -1293,16 +1298,17 @@ int ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBlock
             BN_bin2bn(data + k * SEGMENT_SIZE, SEGMENT_SIZE, data_bn[k]);
 
 			// JD test
-			#ifdef TEST_MODE
+			//#ifdef TEST_MODE
 
 			testFile[(SEGMENT_PER_BLOCK * j) + k] = BN_new();
 			BN_zero(testFile[(SEGMENT_PER_BLOCK * j) + k]);
 			BN_copy(testFile[(SEGMENT_PER_BLOCK * j) + k], data_bn[k]);
 
-			#endif
+			//#endif
 			// end JD test
 
         }
+		//ocall_printf("data:", 5,0);
 
 		// Generate sigma tag for the block.
         BIGNUM *sigma_bn = BN_new();
@@ -1322,6 +1328,7 @@ int ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBlock
 		// end JD test
 
         BN_bn2binpad(sigma_bn, sigma + (blockNum * (PRIME_LENGTH/8)), ceil((double)PRIME_LENGTH/8));
+		//ocall_printf("sigma:", 7,0);
 		//ocall_printf(sigma + (blockNum * (PRIME_LENGTH/8)),PRIME_LENGTH/8, 1);
         BN_free(sigma_bn);
         for(int k = 0; k < SEGMENT_PER_BLOCK; k++) {
@@ -1329,6 +1336,7 @@ int ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBlock
         }
         blockNum++;
     }
+	ocall_printf("data done", 10,0);
 
     // Free the allocated BIGNUMs
     for (j = 0; j < SEGMENT_PER_BLOCK; j++) {
@@ -1341,6 +1349,7 @@ int ecall_file_init(const char *fileName, Tag *tag, uint8_t *sigma, int numBlock
     // Encrypt alpha with encKey and perform MAC
 	//ocall_printf("prep_tag",9,0);
     prepare_tag(tag, porSK);
+	
 	//ocall_printf("done",5,0);
 
     return i;
@@ -1390,13 +1399,28 @@ void ecall_audit_file(const char *fileName, int *ret)
 
 	DecryptData((uint32_t *)tempKey, segData, KEY_SIZE);
 
+	//ocall_printf("\n\n", 2, 0);
+
+	//ocall_printf(segData, 512, 1);
+
+
 	// Call fix_tag(), which will check the MAC, and decrypt alphas and prfKey
 
 	Tag *tag = (Tag *)malloc(sizeof(Tag));
 
 	memcpy(tag, segData, sizeof(Tag));
+
+	// ocall_printf("tag:", 4,0);
+	// for(int j = 0; j < SEGMENT_PER_BLOCK; j++) {
+	// 	ocall_printf(tag->alpha[j], PRIME_LENGTH / 8, 1);
+	// }
 	
 	decrypt_tag(tag, porSK);
+
+	// ocall_printf("tag:", 4,0);
+	// for(int j = 0; j < SEGMENT_PER_BLOCK; j++) {
+	// 	ocall_printf(tag->alpha[j], PRIME_LENGTH / 8, 1);
+	// }
 
 	// JD test alphas
 	#ifdef TEST_MODE
@@ -1429,7 +1453,7 @@ void ecall_audit_file(const char *fileName, int *ret)
 		testCoefficients[j] = BN_new();
 		BN_zero(testCoefficients[j]);
 		BN_copy(testCoefficients[j], temp);
-	}
+	}tag
 
 	#endif
 	// end JD test
@@ -1489,6 +1513,9 @@ void ecall_audit_file(const char *fileName, int *ret)
 		 if (!BN_bin2bn(sigData + (segIndex * (PRIME_LENGTH / 8)), PRIME_LENGTH / 8, bsigma)) {
   		      // handle error
    		 }
+
+		//ocall_printf("sigma:", 7,0);
+		//ocall_printf(sigData + (segIndex * (PRIME_LENGTH / 8)), PRIME_LENGTH / 8, 1);
 
  	   // JD test sigma and coefficient
 	   #ifdef TEST_MODE
@@ -1610,17 +1637,29 @@ void ecall_audit_file(const char *fileName, int *ret)
 
 	 		hmac_sha1(challKey, KEY_SIZE, (uint8_t *)&segNum, sizeof(uint8_t), tempKey, &len);
 	 		ocall_get_segment(fileName, segNum, segData, 0);
+			
 	 		DecryptData((uint32_t *)tempKey, segData, KEY_SIZE);
+
+
 	 		BN_bin2bn(segData, SEGMENT_SIZE, bsigData);
 
 			// JD test segment
-			#ifdef TEST_MODE
+			//#ifdef TEST_MODE
 
-			if(BN_cmp(bsegData, testFile[segNum]) != 0) {
-				ocall_printf("fail data1", 11, 0);
+			// ocall_printf("\n", 2, 0);
+			// ocall_printf("Bad data??\n", 12,0);
+			// printBN(bsigData, 512);
+			// ocall_printf("\n", 2,0);
+
+			if(BN_cmp(bsigData, testFile[segNum]) != 0) {
+				ocall_printf("fail data1\n", 12, 0);
 			}
+			//ocall_p
 
-			#endif
+			// ocall_printf("Good data:\n", 12,0);
+			// printBN(testFile[segNum], 512);
+
+			//#endif
 			// end JD test
 			BN_mod(bsigData, bsigData, bprime, ctx);
 			BN_mod_mul(product4, bsigData, alpha, bprime, ctx);
@@ -1638,12 +1677,12 @@ void ecall_audit_file(const char *fileName, int *ret)
 	BN_mod_add(sigma2, sum1, sum2, bprime, ctx);
 	BN_CTX_end(ctx);
 
-	//uint8_t sigs[PRIME_LENGTH / 8];
-	//BN_bn2bin(sigma, sigs);
-	//ocall_printf("SIGMA (1 and 2): ", 18, 0);
-	//ocall_printf(sigs, PRIME_LENGTH / 8, 1);
-	//BN_bn2bin(sigma2, sigs);
-	//ocall_printf(sigs, PRIME_LENGTH / 8, 1);
+	uint8_t sigs[PRIME_LENGTH / 8];
+	BN_bn2bin(sigma, sigs);
+	ocall_printf("SIGMA (1 and 2): ", 18, 0);
+	ocall_printf(sigs, PRIME_LENGTH / 8, 1);
+	BN_bn2bin(sigma2, sigs);
+	ocall_printf(sigs, PRIME_LENGTH / 8, 1);
 
 	// Compare the two calculations
 	*ret = BN_cmp(sigma, sigma2);

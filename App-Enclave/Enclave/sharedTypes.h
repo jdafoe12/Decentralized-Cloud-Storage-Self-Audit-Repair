@@ -16,6 +16,8 @@
 
 #define FILE_NAME_LEN 512
 #define MAX_FILES 10
+#define FILE_SIZE 10
+#define NUM_GROUPS 2
 
 #define NUM_CHAL_BLOCKS 5
 #define NUM_ORIGINAL_SYMBOLS 2 // Erasure code parameters. Maybe should be part of File struct
